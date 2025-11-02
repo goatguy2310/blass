@@ -4,12 +4,7 @@
 
 int main() {
     Tensor<float> tensor({2, 3});
-    tensor[0][0] = 1.0f;
-    tensor[0][1] = 2.0f;
-    tensor[0][2] = 3.0f;
-    tensor[1][0] = 4.0f;
-    tensor[1][1] = 5.0f;
-    tensor[1][2] = 6.0f;
+    tensor = 6.7f;
 
     std::cout << tensor[0][0].size() << "\n";
 
