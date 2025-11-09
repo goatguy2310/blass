@@ -1,15 +1,17 @@
 #include <iostream>
 
 #include "tensor/tensor.h"
+using namespace blass;
 
 int main() {
-    Tensor<float> tensor({2, 3});
-    tensor = 6.7f;
-
-    std::cout << tensor[0][0].size() << "\n";
-
+    Tensor<float> tensor = {{1, 2, 3}, {4, 5, 6}};
+    tensor = tensor + tensor - 2;
     std::cout << "First element: " << tensor.scalar() << "\n";
-    std::cout << "Tensor size: " << tensor.size() << "\n";
+    std::cout << "Tensor shape: ";
+    for (const auto& dim : tensor.get_shape()) {
+        std::cout << dim << " ";
+    }
+    std::cout << "\n";
 
     Tensor<float> slice = tensor[0];
     for (size_t i = 0; i < slice.size(); ++i) {

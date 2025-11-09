@@ -13,13 +13,16 @@ TARGET = $(BUILD)/main
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
+	@echo "Linking $@"
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 $(BUILD)/%.o: src/%.cpp | build
+	@echo "Compiling $<"
 	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
 
 build:
-	mkdir -p build
+	@mkdir -p build
+	@mkdir -p build/tensor
 
 .PHONY: clean
 clean:
