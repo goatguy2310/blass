@@ -11,3 +11,8 @@ Basic Linear Algebra Subprogram Simplified
 - Basic math ops (element-wise, matmul, convolution)
 - Threading
 - Autograd
+
+### Graph compiler (to optimize autograd graph)
+- Graph
+- Constant
+- Whatever
