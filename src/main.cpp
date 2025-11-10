@@ -5,7 +5,7 @@ using namespace blass;
 
 int main() {
     Tensor<float> tensor = {{1, 2, 3}, {4, 5, 6}};
-    tensor = tensor + tensor - 2;
+    tensor = tensor + tensor;
     std::cout << "First element: " << tensor.scalar() << "\n";
     std::cout << "Tensor shape: ";
     for (const auto& dim : tensor.get_shape()) {

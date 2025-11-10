@@ -16,7 +16,7 @@ namespace blass {
         assert(a.get_shape() == b.get_shape() && "Shapes must match for subtraction");
         Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
         for (size_t i = 0; i < a.size(); ++i) {
-            result[i].scalar() = a[i].scalar() - b[i].scalar();
+            result.data[i] = a.data[i] - b.data[i];
         }
         return result;
     }
@@ -26,7 +26,7 @@ namespace blass {
         assert(a.get_shape() == b.get_shape() && "Shapes must match for multiplication");
         Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
         for (size_t i = 0; i < a.size(); ++i) {
-            result[i].scalar() = a[i].scalar() * b[i].scalar();
+            result.data[i] = a.data[i] * b.data[i];
         }
         return result;
     }
@@ -71,5 +71,10 @@ namespace blass {
             result.data[i] = this->data[i] * scalar;
         }
         return result;
+    }
+
+    template <typename T>
+    Tensor<T> convolution(const Tensor<T> &a, const Tensor<T> &b) {
+        return Tensor<T>::from_shape(1);
     }
 }

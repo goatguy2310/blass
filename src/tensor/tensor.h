@@ -27,6 +27,9 @@ namespace blass {
     Tensor<T> multiply(const Tensor<T>& a, const Tensor<T>& b);
 
     template <typename T>
+    Tensor<T> convolution(const Tensor<T>& a, const Tensor<T>& b);
+
+    template <typename T>
     class Tensor {
     private:
         std::shared_ptr<T[]> data;
@@ -147,6 +150,44 @@ namespace blass {
             return Tensor<T>(slice, new_shape);
         }
 
+        template<typename... Indices>
+        T& operator()(Indices... indices) {
+            if (sizeof...(indices) != shape.size()) {
+                throw std::invalid_argument("Incorrect number of indices provided.");
+            }
+
+            size_t idxs[] = { static_cast<size_t>(indices)... };
+
+            size_t offset = 0;
+            for (size_t i = 0; i < shape.size(); i++) {
+                if (idxs[i] >= shape[i]) {
+                    throw std::out_of_range("Index out of range.");
+                }
+                offset += idxs[i] * strides[i];
+            }
+
+            return data[offset];
+        }
+
+        template<typename... Indices>
+        const T& operator()(Indices... indices) {
+            if (sizeof...(indices) != shape.size()) {
+                throw std::invalid_argument("Incorrect number of indices provided.");
+            }
+
+            size_t idxs[] = { static_cast<size_t>(indices)... };
+
+            size_t offset = 0;
+            for (size_t i = 0; i < shape.size(); i++) {
+                if (idxs[i] >= shape[i]) {
+                    throw std::out_of_range("Index out of range.");
+                }
+                offset += idxs[i] * strides[i];
+            }
+
+            return data[offset];
+        }
+
         Tensor<T>& operator=(T scalar) {
             for (size_t i = 0; i < sz; ++i) {
                 data[i] = scalar;
@@ -185,6 +226,7 @@ namespace blass {
         friend Tensor<T> add<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> subtract<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> multiply<>(const Tensor<T>& a, const Tensor<T>& b);
+        friend Tensor<T> convolution<>(const Tensor<T>& a, const Tensor<T>& b);
 
         Tensor<T> operator+(const Tensor<T>& other) const;
         Tensor<T> operator+(const T& scalar) const;
