@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <numeric>
+#include <sstream>
 #include <initializer_list>
 #include <type_traits>
 #include <stdexcept>
@@ -111,6 +112,11 @@ namespace blass {
             sz = strides.empty() ? 1 : strides[0] * shape[0];
         }
 
+        Tensor(const std::shared_ptr<T[]>& data_, const std::vector<size_t>& shape_, const std::vector<size_t>& strides_)
+        : data(data_), shape(shape_), strides(strides_) {
+            sz = strides.empty() ? 1 : strides[0] * shape[0];
+        }
+
         template <typename U>
         Tensor(std::initializer_list<U> list) {
             init_from_list(list);
@@ -146,17 +152,50 @@ namespace blass {
             init_from_list(list);
         }
 
-        Tensor<T> operator[](size_t index) {
+        Tensor<T> at(size_t index) const {
+            if (shape.empty()) {
+                throw std::out_of_range("Cannot index into a scalar tensor");
+            }
+            if (index >= shape[0]) {
+                throw std::out_of_range("Index out of range at dimension 0");
+            }
             std::shared_ptr<T[]> slice(data, data.get() + index * strides[0]);
             std::vector<size_t> new_shape(shape.begin() + 1, shape.end());
+            std::vector<size_t> new_strides(strides.begin() + 1, strides.end());
 
-            return Tensor<T>(slice, new_shape);
+            return Tensor<T>(slice, new_shape, new_strides);
+        }
+
+        Tensor<T> at(const std::vector<size_t>& indices) const {
+            if (indices.size() > shape.size()) {
+                throw std::out_of_range("Too many indices provided");
+            }
+            size_t offset = 0;
+            for (size_t i = 0; i < indices.size(); i++) {
+                if (indices[i] >= shape[i]) {
+                    throw std::out_of_range("Index out of range at dimension " + std::to_string(i));
+                }
+                offset += indices[i] * strides[i];
+            }
+            std::shared_ptr<T[]> slice(data, data.get() + offset);
+            std::vector<size_t> new_shape(shape.begin() + indices.size(), shape.end());
+            std::vector<size_t> new_strides(strides.begin() + indices.size(), strides.end());
+
+            return Tensor<T>(slice, new_shape, new_strides);
+        }
+
+        Tensor<T> operator[](size_t index) {
+            return at(index);
+        }
+
+        Tensor<T> operator[](const std::vector<size_t>& indices) {
+            return at(indices);
         }
 
         template<typename... Indices>
         T& operator()(Indices... indices) {
             if (sizeof...(indices) != shape.size()) {
-                throw std::invalid_argument("Incorrect number of indices provided.");
+                throw std::invalid_argument("Incorrect number of indices provided");
             }
 
             size_t idxs[] = { static_cast<size_t>(indices)... };
@@ -164,7 +203,7 @@ namespace blass {
             size_t offset = 0;
             for (size_t i = 0; i < shape.size(); i++) {
                 if (idxs[i] >= shape[i]) {
-                    throw std::out_of_range("Index out of range.");
+                    throw std::out_of_range("Index out of range at dimension " + std::to_string(i));
                 }
                 offset += idxs[i] * strides[i];
             }
@@ -175,7 +214,7 @@ namespace blass {
         template<typename... Indices>
         const T& operator()(Indices... indices) const {
             if (sizeof...(indices) != shape.size()) {
-                throw std::invalid_argument("Incorrect number of indices provided.");
+                throw std::invalid_argument("Incorrect number of indices provided");
             }
 
             size_t idxs[] = { static_cast<size_t>(indices)... };
@@ -183,24 +222,12 @@ namespace blass {
             size_t offset = 0;
             for (size_t i = 0; i < shape.size(); i++) {
                 if (idxs[i] >= shape[i]) {
-                    throw std::out_of_range("Index out of range.");
+                    throw std::out_of_range("Index out of range at dimension " + std::to_string(i));
                 }
                 offset += idxs[i] * strides[i];
             }
 
             return data[offset];
-        }
-
-        Tensor<T> view(const std::vector<size_t>& new_shape) {
-            size_t new_size = 1;
-            for (const auto& dim : new_shape) {
-                new_size *= dim;
-            }
-            if (new_size != sz) {
-                throw std::invalid_argument("New shape must have the same number of elements as the original tensor.");
-            }
-
-            return Tensor<T>(data, new_shape);
         }
 
         Tensor<T>& operator=(T scalar) {
@@ -236,7 +263,31 @@ namespace blass {
         size_t size() const {
             return sz;
         }
-    
+
+        std::string to_string() {
+            std::ostringstream oss;
+            if (is_scalar()) {
+                oss << scalar();
+            } else {
+                oss << "[";
+                for (size_t i = 0; i < shape[0]; i++) {
+                    oss << at(i).to_string();
+                    if (i < shape[0] - 1) {
+                        oss << ", ";
+                    }
+                }
+                oss << "]";
+            }
+            return oss.str();
+        }
+
+        // utilities
+        bool is_contiguous() const;
+        Tensor<T> contiguous() const;
+        Tensor<T> transpose(const std::vector<size_t>& perm) const;
+        Tensor<T> transpose() const;
+        Tensor<T> view(const std::vector<int>& new_shape) const;
+
         // arithmetics
         friend Tensor<T> add<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> subtract<>(const Tensor<T>& a, const Tensor<T>& b);

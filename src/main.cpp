@@ -34,5 +34,16 @@ int main() {
         std::cout << "Slice element " << i << ": " << slice[i].scalar() << "\n";
     }
 
+    std::cout << "View tests\n";
+    std::cout << "Tensor:\n" << tensor.to_string() << "\n";
+    Tensor<float> viewed = tensor.view({3, -1});
+    std::cout << "Viewed Tensor:\n" << viewed.to_string() << "\n";
+    Tensor<float> flat = tensor.view({-1});
+    std::cout << "Flattened Tensor:\n" << flat.to_string() << "\n";
+    
+    std::cout << "Transpose tests\n";
+    std::cout << "Transposed Tensor A:\n" << tensor.transpose().to_string() << "\n";
+    std::cout << "Transposed Tensor B:\n" << tensor_2.transpose().to_string() << "\n";
+
     return 0;
 }
