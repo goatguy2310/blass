@@ -27,7 +27,10 @@ namespace blass {
     Tensor<T> multiply(const Tensor<T>& a, const Tensor<T>& b);
 
     template <typename T>
-    Tensor<T> convolution(const Tensor<T>& a, const Tensor<T>& b);
+    Tensor<T> matmul(const Tensor<T>& a, const Tensor<T>& b);
+
+    template <typename T>
+    Tensor<T> matmul_2d(const Tensor<T>& a, const Tensor<T>& b);
 
     template <typename T>
     class Tensor {
@@ -170,7 +173,7 @@ namespace blass {
         }
 
         template<typename... Indices>
-        const T& operator()(Indices... indices) {
+        const T& operator()(Indices... indices) const {
             if (sizeof...(indices) != shape.size()) {
                 throw std::invalid_argument("Incorrect number of indices provided.");
             }
@@ -186,6 +189,18 @@ namespace blass {
             }
 
             return data[offset];
+        }
+
+        Tensor<T> view(const std::vector<size_t>& new_shape) {
+            size_t new_size = 1;
+            for (const auto& dim : new_shape) {
+                new_size *= dim;
+            }
+            if (new_size != sz) {
+                throw std::invalid_argument("New shape must have the same number of elements as the original tensor.");
+            }
+
+            return Tensor<T>(data, new_shape);
         }
 
         Tensor<T>& operator=(T scalar) {
@@ -226,7 +241,8 @@ namespace blass {
         friend Tensor<T> add<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> subtract<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> multiply<>(const Tensor<T>& a, const Tensor<T>& b);
-        friend Tensor<T> convolution<>(const Tensor<T>& a, const Tensor<T>& b);
+        friend Tensor<T> matmul<>(const Tensor<T>& a, const Tensor<T>& b);
+        friend Tensor<T> matmul_2d<>(const Tensor<T>& a, const Tensor<T>& b);
 
         Tensor<T> operator+(const Tensor<T>& other) const;
         Tensor<T> operator+(const T& scalar) const;
