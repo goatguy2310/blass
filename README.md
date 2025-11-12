@@ -10,7 +10,7 @@ Basic Linear Algebra Subprogram Simplified
 - [x] Flatten, reshape, slicing, transpose
 - [ ] Basic math ops
     - [x] Element-wise
-    - [ ] Broadcasting
+    - [x] Broadcasting
     - [ ] Matmul, convolution
 - [ ] Threading
 - [ ] Autograd

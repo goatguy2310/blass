@@ -1,4 +1,5 @@
 #include <cassert>
+#include <functional>
 
 std::string to_string_vec(const std::vector<size_t>& vec) {
     std::ostringstream oss;
@@ -145,42 +146,97 @@ namespace blass {
     }
     
     template <typename T>
+    void blass::elementwise_op(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
+                               const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, std::function<T(const T&, const T&)> F) {
+        if (dim == shape.size() - 1) {
+            for (size_t i = 0; i < shape[dim]; i++) {
+                T* ptr_a = a.data.get();
+                T* ptr_b = b.data.get();
+                T* ptr_res = result.data.get();
+                ptr_res[offset_res + i] = F(ptr_a[offset_a + i * a.strides[dim]], ptr_b[offset_b + i * b.strides[dim]]);
+            }
+            return;
+        }
+        for (size_t i = 0; i < shape[dim]; i++) 
+            elementwise_op<T>(a, b, result, shape, dim + 1, offset_a + i * a.strides[dim], offset_b + i * b.strides[dim], offset_res + i * result.strides[dim], F);
+    }
+
+    template <typename T>
     Tensor<T> add(const Tensor<T>& a, const Tensor<T>& b) {
-        assert(a.get_shape() == b.get_shape() && "Shapes must match for addition");
         if (!a.is_contiguous() || !b.is_contiguous()) {
             return a.contiguous() + b.contiguous();
         }
-        Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
-        for (size_t i = 0; i < a.size(); ++i) {
-            result.data[i] = a.data[i] + b.data[i];
+
+        if (a.get_shape() == b.get_shape() && a.size() == b.size()) {
+            Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
+            for (size_t i = 0; i < a.size(); ++i) {
+                result.data[i] = a.data[i] + b.data[i];
+            }
+            return result;
         }
-        return result;
+        else {
+            std::vector<size_t> result_shape = broadcast_shape<T>(a.get_shape(), b.get_shape());
+            Tensor<T> a_broadcasted = a.broadcast(result_shape);
+            Tensor<T> b_broadcasted = b.broadcast(result_shape);
+            Tensor<T> result = Tensor<T>::from_shape(result_shape);
+
+            std::function<T(const T&, const T&)> func = [](const T& x, const T& y) { return x + y; };
+            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, func);
+
+            return result;
+        }
     }
 
     template <typename T>
     Tensor<T> subtract(const Tensor<T>& a, const Tensor<T>& b) {
-        assert(a.get_shape() == b.get_shape() && "Shapes must match for subtraction");
         if (!a.is_contiguous() || !b.is_contiguous()) {
             return a.contiguous() - b.contiguous();
         }
-        Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
-        for (size_t i = 0; i < a.size(); ++i) {
-            result.data[i] = a.data[i] - b.data[i];
+
+        if (a.get_shape() == b.get_shape() && a.size() == b.size()) {
+            Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
+            for (size_t i = 0; i < a.size(); ++i) {
+                result.data[i] = a.data[i] - b.data[i];
+            }
+            return result;
         }
-        return result;
+        else {
+            std::vector<size_t> result_shape = broadcast_shape<T>(a.get_shape(), b.get_shape());
+            Tensor<T> a_broadcasted = a.broadcast(result_shape);
+            Tensor<T> b_broadcasted = b.broadcast(result_shape);
+            Tensor<T> result = Tensor<T>::from_shape(result_shape);
+
+            std::function<T(const T&, const T&)> func = [](const T& x, const T& y) { return x - y; };
+            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, func);
+
+            return result;
+        }
     }
 
     template <typename T>
     Tensor<T> multiply(const Tensor<T>& a, const Tensor<T>& b) {
-        assert(a.get_shape() == b.get_shape() && "Shapes must match for multiplication");
         if (!a.is_contiguous() || !b.is_contiguous()) {
             return a.contiguous() * b.contiguous();
         }
-        Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
-        for (size_t i = 0; i < a.size(); ++i) {
-            result.data[i] = a.data[i] * b.data[i];
+
+        if (a.get_shape() == b.get_shape() && a.size() == b.size()) {
+            Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
+            for (size_t i = 0; i < a.size(); ++i) {
+                result.data[i] = a.data[i] * b.data[i];
+            }
+            return result;
         }
-        return result;
+        else {
+            std::vector<size_t> result_shape = broadcast_shape<T>(a.get_shape(), b.get_shape());
+            Tensor<T> a_broadcasted = a.broadcast(result_shape);
+            Tensor<T> b_broadcasted = b.broadcast(result_shape);
+            Tensor<T> result = Tensor<T>::from_shape(result_shape);
+
+            std::function<T(const T&, const T&)> func = [](const T& x, const T& y) { return x * y; };
+            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, func);
+
+            return result;
+        }
     }
 
     template <typename T>

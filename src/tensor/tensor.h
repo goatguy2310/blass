@@ -7,6 +7,7 @@
 #include <initializer_list>
 #include <type_traits>
 #include <stdexcept>
+#include <functional>
 
 template<typename T>
 struct is_initializer_list : std::false_type {};
@@ -35,6 +36,10 @@ namespace blass {
 
     template <typename T>
     std::vector<size_t> broadcast_shape(const std::vector<size_t>& shape_a, const std::vector<size_t>& shape_b);
+    
+    template <typename T>
+    void elementwise_op(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
+                        const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, std::function<T(const T&, const T&)> F);
 
     template <typename T>
     class Tensor {
@@ -291,7 +296,10 @@ namespace blass {
         Tensor<T> transpose() const;
         Tensor<T> view(const std::vector<int>& new_shape) const;
         Tensor<T> broadcast(const std::vector<size_t>& target_shape) const;
-
+        
+        friend void elementwise_op<>(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
+                                   const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, std::function<T(const T&, const T&)> F);
+    
         // arithmetics
         friend Tensor<T> add<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> subtract<>(const Tensor<T>& a, const Tensor<T>& b);
