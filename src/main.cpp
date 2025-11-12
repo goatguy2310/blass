@@ -26,12 +26,12 @@ int main() {
 
     Tensor<float> slice = tensor[0];
     for (size_t i = 0; i < slice.size(); ++i) {
-        std::cout << "Slice element " << i << ": " << slice[i].scalar() << "\n";
+        std::cout << "Slice element " << i << ": " << slice(i) << "\n";
     }
 
     slice = tensor[1];
     for (size_t i = 0; i < slice.size(); ++i) {
-        std::cout << "Slice element " << i << ": " << slice[i].scalar() << "\n";
+        std::cout << "Slice element " << i << ": " << slice(i) << "\n";
     }
 
     std::cout << "View tests\n";
@@ -44,6 +44,11 @@ int main() {
     std::cout << "Transpose tests\n";
     std::cout << "Transposed Tensor A:\n" << tensor.transpose().to_string() << "\n";
     std::cout << "Transposed Tensor B:\n" << tensor_2.transpose().to_string() << "\n";
+
+    std::cout << "Broadcast tests\n";
+    Tensor<float> small = {1, 2, 3};
+    Tensor<float> broadcasted = small.broadcast({5, 3});
+    std::cout << "Broadcasted Tensor:\n" << broadcasted.to_string() << "\n";
 
     return 0;
 }

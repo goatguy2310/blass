@@ -34,6 +34,9 @@ namespace blass {
     Tensor<T> matmul_2d(const Tensor<T>& a, const Tensor<T>& b);
 
     template <typename T>
+    std::vector<size_t> broadcast_shape(const std::vector<size_t>& shape_a, const std::vector<size_t>& shape_b);
+
+    template <typename T>
     class Tensor {
     private:
         std::shared_ptr<T[]> data;
@@ -287,6 +290,7 @@ namespace blass {
         Tensor<T> transpose(const std::vector<size_t>& perm) const;
         Tensor<T> transpose() const;
         Tensor<T> view(const std::vector<int>& new_shape) const;
+        Tensor<T> broadcast(const std::vector<size_t>& target_shape) const;
 
         // arithmetics
         friend Tensor<T> add<>(const Tensor<T>& a, const Tensor<T>& b);

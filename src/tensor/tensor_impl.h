@@ -1,5 +1,18 @@
 #include <cassert>
 
+std::string to_string_vec(const std::vector<size_t>& vec) {
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 0; i < vec.size(); ++i) {
+        oss << vec[i];
+        if (i < vec.size() - 1) {
+            oss << ", ";
+        }
+    }
+    oss << "]";
+    return oss.str();
+}
+
 namespace blass {
     template <typename T>
     bool Tensor<T>::is_contiguous() const {
@@ -90,6 +103,45 @@ namespace blass {
             throw std::invalid_argument("Total size must remain unchanged in view");
         }
         return Tensor<T>(contiguous().data, std::vector<size_t>(final_shape.begin(), final_shape.end()));
+    }
+
+    template <typename T>
+    std::vector<size_t> broadcast_shape(const std::vector<size_t>& shape_a, const std::vector<size_t>& shape_b) {
+        size_t len_a = shape_a.size();
+        size_t len_b = shape_b.size();
+        size_t len_result = std::max(len_a, len_b);
+        std::vector<size_t> result_shape(len_result, 1);
+
+        for (size_t i = 0; i < len_result; i++) {
+            size_t dim_a = (i < len_result - len_a) ? 1 : shape_a[i - (len_result - len_a)];
+            size_t dim_b = (i < len_result - len_b) ? 1 : shape_b[i - (len_result - len_b)];
+
+            if (dim_a != dim_b && dim_a != 1 && dim_b != 1) {
+                throw std::invalid_argument("Shapes cannot be broadcasted: " + to_string_vec(shape_a) + " and " + to_string_vec(shape_b));
+            }
+            result_shape[i] = std::max(dim_a, dim_b);
+        }
+        return result_shape;
+    }
+
+    template <typename T>
+    Tensor<T> Tensor<T>::broadcast(const std::vector<size_t>& target_shape) const {
+        std::vector<size_t> broadcasted_stride(target_shape.size(), 0);
+        if (target_shape.size() < shape.size()) {
+            throw std::invalid_argument("Cannot broadcast tensor of shape " + to_string_vec(shape) + " to target shape " + to_string_vec(target_shape));
+        }
+        size_t offset = target_shape.size() - shape.size();
+        for (size_t i = 0; i < target_shape.size(); i++) {
+            size_t current_dim = (i < offset) ? 1 : shape[i - offset];
+
+            if (current_dim == target_shape[i]) 
+                broadcasted_stride[i] = (i < offset) ? 0 : strides[i - offset];
+            else if (current_dim == 1) 
+                broadcasted_stride[i] = 0;
+            else 
+                throw std::invalid_argument("Cannot broadcast tensor of shape " + to_string_vec(shape) + " to target shape " + to_string_vec(target_shape));
+        }
+        return Tensor<T>(data, target_shape, broadcasted_stride);
     }
     
     template <typename T>
