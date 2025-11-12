@@ -89,6 +89,12 @@ namespace blass {
             return Tensor<T>(shape_);
         }
 
+        static Tensor<T> fill(const std::vector<size_t>& shape_, const T& value) {
+            Tensor<T> tensor(shape_);
+            std::fill_n(tensor.data.get(), tensor.size(), value);
+            return tensor;
+        }
+
         explicit Tensor(const std::vector<size_t>& shape_) : shape(shape_) {
             strides.resize(shape.size());
             if (!shape.empty()) {
@@ -303,6 +309,8 @@ namespace blass {
 
         Tensor<T> operator*(const Tensor<T>& other) const;
         Tensor<T> operator*(const T& scalar) const;
+
+        Tensor<T> operator/(const T& scalar) const;
     };
 }
 

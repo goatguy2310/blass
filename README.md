@@ -8,6 +8,9 @@ Basic Linear Algebra Subprogram Simplified
 - [x] Getters
 - [x] Add stride and offset (easier to handle when data structure changes)
 - [x] Flatten, reshape, slicing, transpose
+- [ ] Constructors
+    - [x] Fill
+    - [ ] Random (+ distributions)
 - [ ] Basic math ops
     - [x] Element-wise
     - [ ] Broadcasting

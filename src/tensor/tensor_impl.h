@@ -174,6 +174,15 @@ namespace blass {
     }
 
     template <typename T>
+    inline Tensor<T> Tensor<T>::operator/(const T& scalar) const {
+        Tensor<T> result = Tensor<T>::from_shape(this->get_shape());
+        for (size_t i = 0; i < this->size(); ++i) {
+            result.data[i] = this->data[i] / scalar;
+        }
+        return result;
+    }
+
+    template <typename T>
     Tensor<T> matmul_2d(const Tensor<T> &a, const Tensor<T> &b) {
         assert(a.get_shape().size() == 2 && b.get_shape().size() == 2 && "Both tensors must be 2D for matmul_2d");
         assert(a.get_shape(1) == b.get_shape(0) && "Inner dimensions must match for matmul_2d");
