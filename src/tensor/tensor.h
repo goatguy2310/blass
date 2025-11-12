@@ -29,6 +29,9 @@ namespace blass {
     Tensor<T> multiply(const Tensor<T>& a, const Tensor<T>& b);
 
     template <typename T>
+    Tensor<T> divide(const Tensor<T>& a, const Tensor<T>& b);
+
+    template <typename T>
     Tensor<T> matmul(const Tensor<T>& a, const Tensor<T>& b);
 
     template <typename T>
@@ -39,7 +42,7 @@ namespace blass {
     
     template <typename T>
     void elementwise_op(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
-                        const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, std::function<T(const T&, const T&)> F);
+                        const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, char op);
 
     template <typename T>
     class Tensor {
@@ -298,12 +301,13 @@ namespace blass {
         Tensor<T> broadcast(const std::vector<size_t>& target_shape) const;
         
         friend void elementwise_op<>(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
-                                   const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, std::function<T(const T&, const T&)> F);
+                                   const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, char op);
     
         // arithmetics
         friend Tensor<T> add<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> subtract<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> multiply<>(const Tensor<T>& a, const Tensor<T>& b);
+        friend Tensor<T> divide<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> matmul<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> matmul_2d<>(const Tensor<T>& a, const Tensor<T>& b);
 
@@ -315,6 +319,9 @@ namespace blass {
 
         Tensor<T> operator*(const Tensor<T>& other) const;
         Tensor<T> operator*(const T& scalar) const;
+        
+        Tensor<T> operator/(const Tensor<T>& other) const;
+        Tensor<T> operator/(const T& scalar) const;
     };
 }
 

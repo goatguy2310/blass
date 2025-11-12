@@ -147,18 +147,32 @@ namespace blass {
     
     template <typename T>
     void blass::elementwise_op(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
-                               const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, std::function<T(const T&, const T&)> F) {
+                               const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, char op) {
         if (dim == shape.size() - 1) {
             for (size_t i = 0; i < shape[dim]; i++) {
                 T* ptr_a = a.data.get();
                 T* ptr_b = b.data.get();
                 T* ptr_res = result.data.get();
-                ptr_res[offset_res + i] = F(ptr_a[offset_a + i * a.strides[dim]], ptr_b[offset_b + i * b.strides[dim]]);
+                assert(a.strides[dim] <= 1 && b.strides[dim] <= 1 && "Strides for innermost dimension should be 0 or 1?");
+
+                bool a_stride = (a.strides[dim] == 1);
+                bool b_stride = (b.strides[dim] == 1);
+
+                if (op == '+')
+                    ptr_res[offset_res + i] = ptr_a[a_stride ? offset_a + i : offset_a] + ptr_b[b_stride ? offset_b + i : offset_b];
+                else if (op == '-')
+                    ptr_res[offset_res + i] = ptr_a[a_stride ? offset_a + i : offset_a] - ptr_b[b_stride ? offset_b + i : offset_b];
+                else if (op == '*')
+                    ptr_res[offset_res + i] = ptr_a[a_stride ? offset_a + i : offset_a] * ptr_b[b_stride ? offset_b + i : offset_b];
+                else if (op == '/')
+                    ptr_res[offset_res + i] = ptr_a[a_stride ? offset_a + i : offset_a] / ptr_b[b_stride ? offset_b + i : offset_b];
+                else
+                    throw std::invalid_argument("Unsupported operation in elementwise_op");
             }
             return;
         }
         for (size_t i = 0; i < shape[dim]; i++) 
-            elementwise_op<T>(a, b, result, shape, dim + 1, offset_a + i * a.strides[dim], offset_b + i * b.strides[dim], offset_res + i * result.strides[dim], F);
+            elementwise_op(a, b, result, shape, dim + 1, offset_a + i * a.strides[dim], offset_b + i * b.strides[dim], offset_res + i * result.strides[dim], op);
     }
 
     template <typename T>
@@ -180,8 +194,7 @@ namespace blass {
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
 
-            std::function<T(const T&, const T&)> func = [](const T& x, const T& y) { return x + y; };
-            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, func);
+            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, '+');
 
             return result;
         }
@@ -206,8 +219,7 @@ namespace blass {
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
 
-            std::function<T(const T&, const T&)> func = [](const T& x, const T& y) { return x - y; };
-            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, func);
+            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, '-');
 
             return result;
         }
@@ -232,8 +244,32 @@ namespace blass {
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
 
-            std::function<T(const T&, const T&)> func = [](const T& x, const T& y) { return x * y; };
-            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, func);
+            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, '*');
+
+            return result;
+        }
+    }
+
+    template <typename T>
+    Tensor<T> divide(const Tensor<T>& a, const Tensor<T>& b) {
+        if (!a.is_contiguous() || !b.is_contiguous()) {
+            return a.contiguous() / b.contiguous();
+        }
+
+        if (a.get_shape() == b.get_shape() && a.size() == b.size()) {
+            Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
+            for (size_t i = 0; i < a.size(); ++i) {
+                result.data[i] = a.data[i] / b.data[i];
+            }
+            return result;
+        }
+        else {
+            std::vector<size_t> result_shape = broadcast_shape<T>(a.get_shape(), b.get_shape());
+            Tensor<T> a_broadcasted = a.broadcast(result_shape);
+            Tensor<T> b_broadcasted = b.broadcast(result_shape);
+            Tensor<T> result = Tensor<T>::from_shape(result_shape);
+
+            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, '/');
 
             return result;
         }
@@ -252,6 +288,11 @@ namespace blass {
     template <typename T>
     inline Tensor<T> Tensor<T>::operator*(const Tensor<T>& b) const {
         return multiply(*this, b);
+    }
+
+    template <typename T>
+    inline Tensor<T> Tensor<T>::operator/(const Tensor<T>& b) const {
+        return divide(*this, b);
     }
 
     template <typename T>
@@ -277,6 +318,15 @@ namespace blass {
         Tensor<T> result = Tensor<T>::from_shape(this->get_shape());
         for (size_t i = 0; i < this->size(); ++i) {
             result.data[i] = this->data[i] * scalar;
+        }
+        return result;
+    }
+
+    template <typename T>
+    inline Tensor<T> Tensor<T>::operator/(const T& scalar) const {
+        Tensor<T> result = Tensor<T>::from_shape(this->get_shape());
+        for (size_t i = 0; i < this->size(); ++i) {
+            result.data[i] = this->data[i] / scalar;
         }
         return result;
     }
