@@ -42,3 +42,6 @@
 
 # Build dir
 build/
+
+# VSCode settings
+.vscode/

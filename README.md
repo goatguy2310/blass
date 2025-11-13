@@ -13,7 +13,7 @@ Basic Linear Algebra Subprogram Simplified
     - [ ] Random (+ distributions)
 - [ ] Basic math ops
     - [x] Element-wise
-    - [ ] Broadcasting
+    - [x] Broadcasting
     - [ ] Matmul, convolution
 - [ ] Threading
 - [ ] Autograd
