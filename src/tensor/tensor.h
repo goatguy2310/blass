@@ -40,9 +40,9 @@ namespace blass {
     template <typename T>
     std::vector<size_t> broadcast_shape(const std::vector<size_t>& shape_a, const std::vector<size_t>& shape_b);
     
-    template <typename T>
+    template <char op, typename T>
     void elementwise_op(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
-                        const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, char op);
+                        const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res);
 
     template <typename T>
     class Tensor {
@@ -300,8 +300,9 @@ namespace blass {
         Tensor<T> view(const std::vector<int>& new_shape) const;
         Tensor<T> broadcast(const std::vector<size_t>& target_shape) const;
         
-        friend void elementwise_op<>(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
-                                   const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, char op);
+        template <char op, typename U>
+        friend void elementwise_op(const Tensor<U>& a, const Tensor<U>& b, const Tensor<U>& result, 
+                                   const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res);
     
         // arithmetics
         friend Tensor<T> add<>(const Tensor<T>& a, const Tensor<T>& b);
@@ -319,7 +320,7 @@ namespace blass {
 
         Tensor<T> operator*(const Tensor<T>& other) const;
         Tensor<T> operator*(const T& scalar) const;
-        
+
         Tensor<T> operator/(const Tensor<T>& other) const;
         Tensor<T> operator/(const T& scalar) const;
     };

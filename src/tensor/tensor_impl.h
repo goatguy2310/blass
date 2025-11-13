@@ -145,34 +145,32 @@ namespace blass {
         return Tensor<T>(data, target_shape, broadcasted_stride);
     }
     
-    template <typename T>
+    template <char op, typename T>
     void blass::elementwise_op(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
-                               const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, char op) {
+                               const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res) {
         if (dim == shape.size() - 1) {
+            T* ptr_a = a.data.get();
+            T* ptr_b = b.data.get();
+            T* ptr_res = result.data.get();
+            assert(a.strides[dim] <= 1 && b.strides[dim] <= 1 && "Strides for innermost dimension should be 0 or 1?");
+
+            bool a_stride = (a.strides[dim] == 1);
+            bool b_stride = (b.strides[dim] == 1);
+            
             for (size_t i = 0; i < shape[dim]; i++) {
-                T* ptr_a = a.data.get();
-                T* ptr_b = b.data.get();
-                T* ptr_res = result.data.get();
-                assert(a.strides[dim] <= 1 && b.strides[dim] <= 1 && "Strides for innermost dimension should be 0 or 1?");
-
-                bool a_stride = (a.strides[dim] == 1);
-                bool b_stride = (b.strides[dim] == 1);
-
-                if (op == '+')
+                if constexpr (op == '+')
                     ptr_res[offset_res + i] = ptr_a[a_stride ? offset_a + i : offset_a] + ptr_b[b_stride ? offset_b + i : offset_b];
-                else if (op == '-')
+                else if constexpr (op == '-')
                     ptr_res[offset_res + i] = ptr_a[a_stride ? offset_a + i : offset_a] - ptr_b[b_stride ? offset_b + i : offset_b];
-                else if (op == '*')
+                else if constexpr (op == '*')
                     ptr_res[offset_res + i] = ptr_a[a_stride ? offset_a + i : offset_a] * ptr_b[b_stride ? offset_b + i : offset_b];
-                else if (op == '/')
+                else if constexpr (op == '/')
                     ptr_res[offset_res + i] = ptr_a[a_stride ? offset_a + i : offset_a] / ptr_b[b_stride ? offset_b + i : offset_b];
-                else
-                    throw std::invalid_argument("Unsupported operation in elementwise_op");
             }
             return;
         }
         for (size_t i = 0; i < shape[dim]; i++) 
-            elementwise_op(a, b, result, shape, dim + 1, offset_a + i * a.strides[dim], offset_b + i * b.strides[dim], offset_res + i * result.strides[dim], op);
+            elementwise_op<op>(a, b, result, shape, dim + 1, offset_a + i * a.strides[dim], offset_b + i * b.strides[dim], offset_res + i * result.strides[dim]);
     }
 
     template <typename T>
@@ -194,7 +192,7 @@ namespace blass {
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
 
-            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, '+');
+            elementwise_op<'+'> (a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0);
 
             return result;
         }
@@ -219,7 +217,7 @@ namespace blass {
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
 
-            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, '-');
+            elementwise_op<'-'> (a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0);
 
             return result;
         }
@@ -244,7 +242,7 @@ namespace blass {
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
 
-            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, '*');
+            elementwise_op<'*'>(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0);
 
             return result;
         }
@@ -269,7 +267,7 @@ namespace blass {
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
 
-            elementwise_op(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0, '/');
+            elementwise_op<'/'>(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0);
 
             return result;
         }
