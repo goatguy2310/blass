@@ -106,6 +106,14 @@ namespace blass {
             return tensor;
         }
 
+        static Tensor<T> fill_random(const std::vector<size_t>& shape_, const T& min_value, const T& max_value) {
+            Tensor<T> tensor(shape_);
+            for (size_t i = 0; i < tensor.size(); ++i) {
+                tensor.data[i] = min_value + static_cast<T>(rand()) / (static_cast<T>(RAND_MAX / (max_value - min_value)));
+            }
+            return tensor;
+        }
+
         explicit Tensor(const std::vector<size_t>& shape_) : shape(shape_) {
             strides.resize(shape.size());
             if (!shape.empty()) {

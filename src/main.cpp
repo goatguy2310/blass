@@ -55,10 +55,5 @@ int main() {
     std::cout << "Sum of " << tensor_a.to_string() << " and " << tensor_b.to_string() << ":\n";
     std::cout << (tensor_a + tensor_b).to_string() << "\n";
     
-    Tensor<float> filled_tensor = Tensor<float>::fill({1, 100000000}, 9.0f);
-    Tensor<float> tensor_3 = {1};
-    Tensor<float> sum_tensor = filled_tensor + tensor_3;
-    std::cout << "Sum of filled tensor and tensor_3 first element: " << sum_tensor(0, 90000000) << "\n";
-
     return 0;
 }
