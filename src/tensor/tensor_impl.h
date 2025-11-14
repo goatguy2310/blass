@@ -157,15 +157,56 @@ namespace blass {
             bool a_stride = (a.strides[dim] == 1);
             bool b_stride = (b.strides[dim] == 1);
             
-            for (size_t i = 0; i < shape[dim]; i++) {
-                if constexpr (op == '+')
-                    ptr_res[offset_res + i] = ptr_a[a_stride ? offset_a + i : offset_a] + ptr_b[b_stride ? offset_b + i : offset_b];
-                else if constexpr (op == '-')
-                    ptr_res[offset_res + i] = ptr_a[a_stride ? offset_a + i : offset_a] - ptr_b[b_stride ? offset_b + i : offset_b];
-                else if constexpr (op == '*')
-                    ptr_res[offset_res + i] = ptr_a[a_stride ? offset_a + i : offset_a] * ptr_b[b_stride ? offset_b + i : offset_b];
-                else if constexpr (op == '/')
-                    ptr_res[offset_res + i] = ptr_a[a_stride ? offset_a + i : offset_a] / ptr_b[b_stride ? offset_b + i : offset_b];
+            if (a_stride && b_stride) {
+                for (size_t i = 0; i < shape[dim]; i++) {
+                    if constexpr (op == '+')
+                        ptr_res[offset_res + i] = ptr_a[offset_a + i] + ptr_b[offset_b + i];
+                    else if constexpr (op == '-')
+                        ptr_res[offset_res + i] = ptr_a[offset_a + i] - ptr_b[offset_b + i];
+                    else if constexpr (op == '*')
+                        ptr_res[offset_res + i] = ptr_a[offset_a + i] * ptr_b[offset_b + i];
+                    else if constexpr (op == '/')
+                        ptr_res[offset_res + i] = ptr_a[offset_a + i] / ptr_b[offset_b + i];
+                }
+            }
+
+            if (a_stride && !b_stride) {
+                for (size_t i = 0; i < shape[dim]; i++) {
+                    if constexpr (op == '+')
+                        ptr_res[offset_res + i] = ptr_a[offset_a + i] + ptr_b[offset_b];
+                    else if constexpr (op == '-')
+                        ptr_res[offset_res + i] = ptr_a[offset_a + i] - ptr_b[offset_b];
+                    else if constexpr (op == '*')
+                        ptr_res[offset_res + i] = ptr_a[offset_a + i] * ptr_b[offset_b];
+                    else if constexpr (op == '/')
+                        ptr_res[offset_res + i] = ptr_a[offset_a + i] / ptr_b[offset_b];
+                }
+            }
+
+            if (!a_stride && b_stride) {
+                for (size_t i = 0; i < shape[dim]; i++) {
+                    if constexpr (op == '+')
+                        ptr_res[offset_res + i] = ptr_a[offset_a] + ptr_b[offset_b + i];
+                    else if constexpr (op == '-')
+                        ptr_res[offset_res + i] = ptr_a[offset_a] - ptr_b[offset_b + i];
+                    else if constexpr (op == '*')
+                        ptr_res[offset_res + i] = ptr_a[offset_a] * ptr_b[offset_b + i];
+                    else if constexpr (op == '/')
+                        ptr_res[offset_res + i] = ptr_a[offset_a] / ptr_b[offset_b + i];
+                }
+            }
+
+            if (!a_stride && !b_stride) {
+                for (size_t i = 0; i < shape[dim]; i++) {
+                    if constexpr (op == '+')
+                        ptr_res[offset_res + i] = ptr_a[offset_a] + ptr_b[offset_b];
+                    else if constexpr (op == '-')
+                        ptr_res[offset_res + i] = ptr_a[offset_a] - ptr_b[offset_b];
+                    else if constexpr (op == '*')
+                        ptr_res[offset_res + i] = ptr_a[offset_a] * ptr_b[offset_b];
+                    else if constexpr (op == '/')
+                        ptr_res[offset_res + i] = ptr_a[offset_a] / ptr_b[offset_b];
+                }
             }
             return;
         }
