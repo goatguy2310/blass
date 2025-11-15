@@ -53,7 +53,7 @@ int main() {
     Tensor<float> tensor_b = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
     std::cout << "\n";
     std::cout << "Sum of " << tensor_a.to_string() << " and " << tensor_b.to_string() << ":\n";
-    std::cout << (tensor_a + tensor_b).to_string() << "\n";
+    // std::cout << (tensor_a + tensor_b).to_string() << "\n";
     
     return 0;
 }

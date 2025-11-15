@@ -148,10 +148,10 @@ namespace blass {
     template <char op, typename T>
     void blass::elementwise_op(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
                                const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res) {
-        if (dim == shape.size() - 1) {
-            T* ptr_a = a.data.get();
-            T* ptr_b = b.data.get();
-            T* ptr_res = result.data.get();
+        if (dim == shape.size() - 1 || result.strides[dim] == 1) {
+            T* __restrict__ ptr_a = a.data.get() + offset_a;
+            T* __restrict__ ptr_b = b.data.get() + offset_b;
+            T* __restrict__ ptr_res = result.data.get() + offset_res;
             assert(a.strides[dim] <= 1 && b.strides[dim] <= 1 && "Strides for innermost dimension should be 0 or 1?");
 
             bool a_stride = (a.strides[dim] == 1);
@@ -160,52 +160,52 @@ namespace blass {
             if (a_stride && b_stride) {
                 for (size_t i = 0; i < shape[dim]; i++) {
                     if constexpr (op == '+')
-                        ptr_res[offset_res + i] = ptr_a[offset_a + i] + ptr_b[offset_b + i];
+                        ptr_res[i] = ptr_a[i] + ptr_b[i];
                     else if constexpr (op == '-')
-                        ptr_res[offset_res + i] = ptr_a[offset_a + i] - ptr_b[offset_b + i];
+                        ptr_res[i] = ptr_a[i] - ptr_b[i];
                     else if constexpr (op == '*')
-                        ptr_res[offset_res + i] = ptr_a[offset_a + i] * ptr_b[offset_b + i];
+                        ptr_res[i] = ptr_a[i] * ptr_b[i];
                     else if constexpr (op == '/')
-                        ptr_res[offset_res + i] = ptr_a[offset_a + i] / ptr_b[offset_b + i];
+                        ptr_res[i] = ptr_a[i] / ptr_b[i];
                 }
             }
 
             if (a_stride && !b_stride) {
                 for (size_t i = 0; i < shape[dim]; i++) {
                     if constexpr (op == '+')
-                        ptr_res[offset_res + i] = ptr_a[offset_a + i] + ptr_b[offset_b];
+                        ptr_res[i] = ptr_a[i] + ptr_b[0];
                     else if constexpr (op == '-')
-                        ptr_res[offset_res + i] = ptr_a[offset_a + i] - ptr_b[offset_b];
+                        ptr_res[i] = ptr_a[i] - ptr_b[0];
                     else if constexpr (op == '*')
-                        ptr_res[offset_res + i] = ptr_a[offset_a + i] * ptr_b[offset_b];
+                        ptr_res[i] = ptr_a[i] * ptr_b[0];
                     else if constexpr (op == '/')
-                        ptr_res[offset_res + i] = ptr_a[offset_a + i] / ptr_b[offset_b];
+                        ptr_res[i] = ptr_a[i] / ptr_b[0];
                 }
             }
 
             if (!a_stride && b_stride) {
                 for (size_t i = 0; i < shape[dim]; i++) {
                     if constexpr (op == '+')
-                        ptr_res[offset_res + i] = ptr_a[offset_a] + ptr_b[offset_b + i];
+                        ptr_res[i] = ptr_a[0] + ptr_b[i];
                     else if constexpr (op == '-')
-                        ptr_res[offset_res + i] = ptr_a[offset_a] - ptr_b[offset_b + i];
+                        ptr_res[i] = ptr_a[0] - ptr_b[i];
                     else if constexpr (op == '*')
-                        ptr_res[offset_res + i] = ptr_a[offset_a] * ptr_b[offset_b + i];
+                        ptr_res[i] = ptr_a[0] * ptr_b[i];
                     else if constexpr (op == '/')
-                        ptr_res[offset_res + i] = ptr_a[offset_a] / ptr_b[offset_b + i];
+                        ptr_res[i] = ptr_a[0] / ptr_b[i];
                 }
             }
 
             if (!a_stride && !b_stride) {
                 for (size_t i = 0; i < shape[dim]; i++) {
                     if constexpr (op == '+')
-                        ptr_res[offset_res + i] = ptr_a[offset_a] + ptr_b[offset_b];
+                        ptr_res[i] = ptr_a[0] + ptr_b[0];
                     else if constexpr (op == '-')
-                        ptr_res[offset_res + i] = ptr_a[offset_a] - ptr_b[offset_b];
+                        ptr_res[i] = ptr_a[0] - ptr_b[0];
                     else if constexpr (op == '*')
-                        ptr_res[offset_res + i] = ptr_a[offset_a] * ptr_b[offset_b];
+                        ptr_res[i] = ptr_a[0] * ptr_b[0];
                     else if constexpr (op == '/')
-                        ptr_res[offset_res + i] = ptr_a[offset_a] / ptr_b[offset_b];
+                        ptr_res[i] = ptr_a[0] / ptr_b[0];
                 }
             }
             return;
