@@ -147,7 +147,7 @@ namespace blass {
     
     template <char op, typename T>
     void blass::elementwise_op(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
-                               const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res) {
+                               const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, bool use_omp) {
         if (dim == shape.size() - 1 || result.strides[dim] == 1) {
             T* __restrict__ ptr_a = a.data.get() + offset_a;
             T* __restrict__ ptr_b = b.data.get() + offset_b;
@@ -156,8 +156,11 @@ namespace blass {
 
             bool a_stride = (a.strides[dim] == 1);
             bool b_stride = (b.strides[dim] == 1);
-            
+
+            bool use_omp_local = use_omp && shape[dim] >= 32;
+
             if (a_stride && b_stride) {
+                #pragma omp parallel for if(use_omp_local)
                 for (size_t i = 0; i < shape[dim]; i++) {
                     if constexpr (op == '+')
                         ptr_res[i] = ptr_a[i] + ptr_b[i];
@@ -171,6 +174,7 @@ namespace blass {
             }
 
             if (a_stride && !b_stride) {
+                #pragma omp parallel for if(use_omp_local)
                 for (size_t i = 0; i < shape[dim]; i++) {
                     if constexpr (op == '+')
                         ptr_res[i] = ptr_a[i] + ptr_b[0];
@@ -184,6 +188,7 @@ namespace blass {
             }
 
             if (!a_stride && b_stride) {
+                #pragma omp parallel for if(use_omp_local)
                 for (size_t i = 0; i < shape[dim]; i++) {
                     if constexpr (op == '+')
                         ptr_res[i] = ptr_a[0] + ptr_b[i];
@@ -197,6 +202,7 @@ namespace blass {
             }
 
             if (!a_stride && !b_stride) {
+                #pragma omp parallel for if(use_omp_local)
                 for (size_t i = 0; i < shape[dim]; i++) {
                     if constexpr (op == '+')
                         ptr_res[i] = ptr_a[0] + ptr_b[0];
@@ -210,8 +216,14 @@ namespace blass {
             }
             return;
         }
-        for (size_t i = 0; i < shape[dim]; i++) 
-            elementwise_op<op>(a, b, result, shape, dim + 1, offset_a + i * a.strides[dim], offset_b + i * b.strides[dim], offset_res + i * result.strides[dim]);
+
+        bool use_omp_local = use_omp && (result.strides.back() / result.strides[dim] <= 32 && shape[dim] >= 32);
+        if (use_omp_local) use_omp = 0;
+
+        #pragma omp parallel for if(use_omp_local)
+        for (size_t i = 0; i < shape[dim]; i++) {
+            elementwise_op<op>(a, b, result, shape, dim + 1, offset_a + i * a.strides[dim], offset_b + i * b.strides[dim], offset_res + i * result.strides[dim], use_omp);
+        }
     }
 
     template <typename T>
@@ -222,6 +234,8 @@ namespace blass {
 
         if (a.get_shape() == b.get_shape() && a.size() == b.size()) {
             Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
+            
+            #pragma omp parallel for if (a.size() >= 1024)
             for (size_t i = 0; i < a.size(); ++i) {
                 result.data[i] = a.data[i] + b.data[i];
             }
@@ -247,6 +261,8 @@ namespace blass {
 
         if (a.get_shape() == b.get_shape() && a.size() == b.size()) {
             Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
+            
+            #pragma omp parallel for if (a.size() >= 1024)
             for (size_t i = 0; i < a.size(); ++i) {
                 result.data[i] = a.data[i] - b.data[i];
             }
@@ -272,6 +288,8 @@ namespace blass {
 
         if (a.get_shape() == b.get_shape() && a.size() == b.size()) {
             Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
+            
+            #pragma omp parallel for if (a.size() >= 1024)
             for (size_t i = 0; i < a.size(); ++i) {
                 result.data[i] = a.data[i] * b.data[i];
             }
@@ -297,6 +315,8 @@ namespace blass {
 
         if (a.get_shape() == b.get_shape() && a.size() == b.size()) {
             Tensor<T> result = Tensor<T>::from_shape(a.get_shape());
+            
+            #pragma omp parallel for if (a.size() >= 1024)
             for (size_t i = 0; i < a.size(); ++i) {
                 result.data[i] = a.data[i] / b.data[i];
             }

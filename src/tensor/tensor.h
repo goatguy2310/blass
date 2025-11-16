@@ -42,7 +42,7 @@ namespace blass {
     
     template <char op, typename T>
     void elementwise_op(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
-                        const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res);
+                        const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, bool use_omp = 1);
 
     template <typename T>
     class Tensor {
@@ -316,7 +316,7 @@ namespace blass {
         
         template <char op, typename U>
         friend void elementwise_op(const Tensor<U>& a, const Tensor<U>& b, const Tensor<U>& result, 
-                                   const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res);
+                                   const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, bool use_omp);
     
         // arithmetics
         friend Tensor<T> add<>(const Tensor<T>& a, const Tensor<T>& b);
