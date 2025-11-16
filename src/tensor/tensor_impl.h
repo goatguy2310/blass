@@ -78,7 +78,7 @@ namespace blass {
             result.shape[i] = shape[perm[i]];
             result.strides[i] = strides[perm[i]];
         }
-        return result;
+        return result.contiguous();
     }
 
     template <typename T>
@@ -407,14 +407,14 @@ namespace blass {
     Tensor<T> matmul_2d(const Tensor<T> &a, const Tensor<T> &b) {
         assert(a.get_shape().size() == 2 && b.get_shape().size() == 2 && "Both tensors must be 2D for matmul_2d");
         assert(a.get_shape(1) == b.get_shape(0) && "Inner dimensions must match for matmul_2d");
-        
+
         size_t m = a.get_shape(0);
         size_t n = a.get_shape(1);
         size_t p = b.get_shape(1);
 
         Tensor<T> result = Tensor<T>::from_shape({m, p});
 
-        Tensor<T> b_transposed = b.transpose().contiguous();
+        Tensor<T> b_transposed = b.transpose();
 
         if (m >= p) {
             #pragma omp parallel for
