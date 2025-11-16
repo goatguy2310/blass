@@ -29,14 +29,14 @@ static void BM_ElemwiseMul(benchmark::State& state) {
     state.SetItemsProcessed(state.iterations() * rows * cols);
 }
 
-BENCHMARK(BM_ElemwiseAdd)->Args({(int)1e8, (int)1})
-                         ->Args({(int)1, (int)1e8})
-                         ->Args({10000, 10000})
-                         ->Args({100, 1000000})
-                         ->Args({1000000, 100})->Unit(benchmark::kMillisecond)->Iterations(5);
-BENCHMARK(BM_ElemwiseMul)->Args({(int)1e8, (int)1})
-                         ->Args({(int)1, (int)1e8})
-                         ->Args({10000, 10000})
-                         ->Args({100, 1000000})
-                         ->Args({1000000, 100})->Unit(benchmark::kMillisecond)->Iterations(5);
+// BENCHMARK(BM_ElemwiseAdd)->Args({(int)1e8, (int)1})
+//                          ->Args({(int)1, (int)1e8})
+//                          ->Args({10000, 10000})
+//                          ->Args({100, 1000000})
+//                          ->Args({1000000, 100})->Unit(benchmark::kMillisecond)->Iterations(5);
+// BENCHMARK(BM_ElemwiseMul)->Args({(int)1e8, (int)1})
+//                          ->Args({(int)1, (int)1e8})
+//                          ->Args({10000, 10000})
+//                          ->Args({100, 1000000})
+//                          ->Args({1000000, 100})->Unit(benchmark::kMillisecond)->Iterations(5);
 BENCHMARK_MAIN();

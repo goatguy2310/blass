@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -fopenmp
+CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -fopenmp
 
 BUILD = build
 

@@ -1,7 +1,7 @@
 #include <cassert>
 #include <functional>
 
-std::string to_string_vec(const std::vector<size_t>& vec) {
+inline std::string to_string_vec(const std::vector<size_t>& vec) {
     std::ostringstream oss;
     oss << "[";
     for (size_t i = 0; i < vec.size(); ++i) {
@@ -33,20 +33,33 @@ namespace blass {
             return *this;
         }
         Tensor<T> result(shape);
-        for (size_t i = 0; i < sz; i++) {
-            size_t idx = i;
-            std::vector<size_t> multi_idx(shape.size());
-            for (size_t d = 0; d < shape.size(); d++) {
-                multi_idx[d] = idx / strides[d];
-                idx = idx % strides[d];
-            }
 
-            size_t orig_offset = 0;
-            for (size_t d = 0; d < shape.size(); d++) {
-                orig_offset += multi_idx[d] * strides[d];
-            }
-            result.data[i] = data[orig_offset];
+        const size_t ndim = shape.size();
+        const size_t total = sz;
+
+        std::vector<size_t> dim_prod(ndim, 1);
+
+        if (ndim > 0) {
+            for (int i = ndim - 2; i >= 0; --i)
+                dim_prod[i] = dim_prod[i + 1] * shape[i + 1];
         }
+
+        #pragma omp parallel 
+        {
+            std::vector<size_t> local_multi(ndim);
+            #pragma omp for schedule(static)
+            for (size_t i = 0; i < total; ++i) {
+                size_t tmp = i;
+                size_t src_offset = 0;
+                for (size_t d = 0; d < ndim; ++d) {
+                    size_t idx = (dim_prod[d] == 0) ? 0 : (tmp / dim_prod[d]);
+                    tmp -= idx * (dim_prod[d] == 0 ? 0 : dim_prod[d]);
+                    src_offset += idx * strides[d];
+                }
+                result.data[i] = data[src_offset];
+            }
+        }
+
         return result;
     }
 
@@ -394,20 +407,51 @@ namespace blass {
     Tensor<T> matmul_2d(const Tensor<T> &a, const Tensor<T> &b) {
         assert(a.get_shape().size() == 2 && b.get_shape().size() == 2 && "Both tensors must be 2D for matmul_2d");
         assert(a.get_shape(1) == b.get_shape(0) && "Inner dimensions must match for matmul_2d");
-
+        
         size_t m = a.get_shape(0);
         size_t n = a.get_shape(1);
         size_t p = b.get_shape(1);
 
         Tensor<T> result = Tensor<T>::from_shape({m, p});
 
-        for (size_t i = 0; i < m; ++i) {
-            for (size_t j = 0; j < p; ++j) {
-                T sum = 0;
-                for (size_t k = 0; k < n; ++k)
-                    sum += a(i, k) * b(k, j);
+        Tensor<T> b_transposed = b.transpose().contiguous();
 
-                result(i, j) = sum;
+        if (m >= p) {
+            #pragma omp parallel for
+            for (size_t i = 0; i < m; ++i) {
+                T* __restrict__ ptr_res_row = result.data.get() + i * result.strides[0];
+                T* __restrict__ ptr_a_row = a.data.get() + i * a.strides[0];
+
+                for (size_t j = 0; j < p; ++j) {
+                    T* __restrict__ ptr_b_row = b_transposed.data.get() + j * b_transposed.strides[0];
+
+                    T sum = 0;
+
+                    #pragma omp simd reduction(+:sum)
+                    for (size_t k = 0; k < n; ++k)
+                        sum += ptr_a_row[k] * ptr_b_row[k];
+
+                    ptr_res_row[j] = sum;
+                }
+            }
+        } 
+        else {
+            #pragma omp parallel for
+            for (size_t j = 0; j < p; ++j) {
+                T* __restrict__ ptr_res_col = result.data.get() + j;
+                T* __restrict__ ptr_b_row = b_transposed.data.get() + j * b_transposed.strides[0];
+                
+                for (size_t i = 0; i < m; ++i) {
+                    T* __restrict__ ptr_a_row = a.data.get() + i * a.strides[0];
+
+                    T sum = 0;
+
+                    #pragma omp simd reduction(+:sum)
+                    for (size_t k = 0; k < n; ++k)
+                        sum += ptr_a_row[k] * ptr_b_row[k];
+
+                    ptr_res_col[i * result.strides[0]] = sum;
+                }
             }
         }
 

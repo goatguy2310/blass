@@ -53,7 +53,13 @@ int main() {
     Tensor<float> tensor_b = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
     std::cout << "\n";
     std::cout << "Sum of " << tensor_a.to_string() << " and " << tensor_b.to_string() << ":\n";
-    // std::cout << (tensor_a + tensor_b).to_string() << "\n";
+    std::cout << (tensor_a + tensor_b).to_string() << "\n";
     
+    // matmul test
+    Tensor<float> mat_a = {{1, 2, 3}, {4, 5, 6}};
+    Tensor<float> mat_b = {{7, 8}, {9, 10}, {11, 12}};
+    Tensor<float> mat_result = matmul_2d(mat_a, mat_b);
+    std::cout << "\nMatrix Multiplication Result:\n" << mat_result.to_string() << "\n";
+
     return 0;
 }
