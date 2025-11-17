@@ -22,3 +22,21 @@ Basic Linear Algebra Subprogram Simplified
 - [ ] Graph
 - [ ] Constant
 - [ ] Whatever
+
+## Usage
+
+To compile main
+```
+make
+```
+
+To run all benchmarks
+```
+make bench
+```
+
+To run individual benchmarks
+```
+make bench_elemwise
+make bench_matmul
+```

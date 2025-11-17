@@ -19,3 +19,4 @@ BENCHMARK(BM_Matmul2D_Square)->Args({256})
                                  ->Args({512})
                                  ->Args({1024})
                                  ->Args({2048})->Unit(benchmark::kMillisecond)->Iterations(5);
+BENCHMARK_MAIN();
