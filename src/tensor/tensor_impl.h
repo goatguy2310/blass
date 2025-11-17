@@ -405,6 +405,10 @@ namespace blass {
 
     template <typename T>
     Tensor<T> matmul_2d(const Tensor<T> &a, const Tensor<T> &b, bool use_omp) {
+        if (!a.is_contiguous()) {
+            return matmul_2d(a.contiguous(), b, use_omp);
+        }
+
         assert(a.get_shape().size() == 2 && b.get_shape().size() == 2 && "Both tensors must be 2D for matmul_2d");
         assert(a.get_shape(1) == b.get_shape(0) && "Inner dimensions must match for matmul_2d");
 
@@ -414,9 +418,27 @@ namespace blass {
 
         Tensor<T> result = Tensor<T>::from_shape({m, p});
 
-        Tensor<T> b_transposed = b.transpose();
+        Tensor<T> b_transposed = b.transpose(); // assumes transpose does automatic contiguous
 
-        if (m >= p) {
+        if (m * p < 32) {
+            for (size_t i = 0; i < m; ++i) {
+                T* __restrict__ ptr_res_row = result.data.get() + i * result.strides[0];
+                T* __restrict__ ptr_a_row = a.data.get() + i * a.strides[0];
+
+                for (size_t j = 0; j < p; ++j) {
+                    T* __restrict__ ptr_b_row = b_transposed.data.get() + j * b_transposed.strides[0];
+
+                    T sum = 0;
+
+                    #pragma omp parallel for simd reduction(+:sum) if (use_omp)
+                    for (size_t k = 0; k < n; ++k)
+                        sum += ptr_a_row[k] * ptr_b_row[k];
+
+                    ptr_res_row[j] = sum;
+                }
+            }
+        }
+        else if (m >= p) {
             #pragma omp parallel for if (use_omp)
             for (size_t i = 0; i < m; ++i) {
                 T* __restrict__ ptr_res_row = result.data.get() + i * result.strides[0];
@@ -508,6 +530,7 @@ namespace blass {
             for (size_t dim : batch_result_shape)
                 batch_size *= dim;
 
+            size_t batch_stride = a.shape[a.shape.size() - 2] * b.shape[b.shape.size() - 1];
             
             const auto& sa = a_broadcasted.strides;
             const auto& sb = b_broadcasted.strides;
@@ -519,29 +542,29 @@ namespace blass {
                 std::vector<size_t> idx(batch_result_shape.size(), 0);
 
                 size_t tmp = i;
-                size_t offset_a = 0, offset_b = 0, offset_res = 0;
+                size_t offset_a = 0, offset_b = 0;
                 for (int dim = batch_result_shape.size() - 1; dim >= 0; --dim) {
                     size_t idx = tmp % batch_result_shape[dim];
                     offset_a += idx * sa[dim];
                     offset_b += idx * sb[dim];
-                    offset_res += idx * result.strides[dim];
                     tmp /= batch_result_shape[dim];
                 }
 
                 std::shared_ptr<T[]> ptr_a = std::shared_ptr<T[]>(a_broadcasted.data, a_broadcasted.data.get() + offset_a);
                 std::shared_ptr<T[]> ptr_b = std::shared_ptr<T[]>(b_broadcasted.data, b_broadcasted.data.get() + offset_b);
-                std::shared_ptr<T[]> ptr_res = std::shared_ptr<T[]>(result.data, result.data.get() + offset_res);
+                T* __restrict__ ptr_res = result.data.get() + i * batch_stride;
 
                 Tensor<T> a_slice(ptr_a, 
                                 {a.shape[a.shape.size() - 2], a.shape[a.shape.size() - 1]});
                 Tensor<T> b_slice(ptr_b, 
                                  {b.shape[b.shape.size() - 2], b.shape[b.shape.size() - 1]});
-                Tensor<T> result_slice(ptr_res, 
-                                      {result_shape[result_shape.size() - 2], result_shape[result_shape.size() - 1]});
 
                 Tensor<T> mat_result = matmul_2d(a_slice, b_slice, !use_omp_batch);
-
-                std::copy(mat_result.data.get(), mat_result.data.get() + mat_result.size(), result_slice.data.get());
+                T* __restrict__ mat_result_ptr = mat_result.data.get();
+                
+                #pragma omp simd
+                for (size_t j = 0; j < mat_result.size(); ++j)
+                    ptr_res[j] = mat_result_ptr[j];
             }
             return result;
         }
