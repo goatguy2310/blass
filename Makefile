@@ -1,3 +1,5 @@
+.DEFAULT_GOAL := all
+
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -fopenmp
 

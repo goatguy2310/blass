@@ -508,7 +508,6 @@ namespace blass {
             for (size_t dim : batch_result_shape)
                 batch_size *= dim;
 
-            std::vector<size_t> idx(batch_result_shape.size(), 0);
             
             const auto& sa = a_broadcasted.strides;
             const auto& sb = b_broadcasted.strides;
@@ -517,11 +516,16 @@ namespace blass {
 
             #pragma omp parallel for if(use_omp_batch)
             for (size_t i = 0; i < batch_size; ++i) {
+                std::vector<size_t> idx(batch_result_shape.size(), 0);
+
+                size_t tmp = i;
                 size_t offset_a = 0, offset_b = 0, offset_res = 0;
-                for (size_t dim = 0; dim < batch_result_shape.size(); ++dim) {
-                    offset_a += idx[dim] * sa[dim];
-                    offset_b += idx[dim] * sb[dim];
-                    offset_res += idx[dim] * result.strides[dim];
+                for (int dim = batch_result_shape.size() - 1; dim >= 0; --dim) {
+                    size_t idx = tmp % batch_result_shape[dim];
+                    offset_a += idx * sa[dim];
+                    offset_b += idx * sb[dim];
+                    offset_res += idx * result.strides[dim];
+                    tmp /= batch_result_shape[dim];
                 }
 
                 std::shared_ptr<T[]> ptr_a = std::shared_ptr<T[]>(a_broadcasted.data, a_broadcasted.data.get() + offset_a);
@@ -536,15 +540,8 @@ namespace blass {
                                       {result_shape[result_shape.size() - 2], result_shape[result_shape.size() - 1]});
 
                 Tensor<T> mat_result = matmul_2d(a_slice, b_slice, !use_omp_batch);
-                
-                std::copy(mat_result.data.get(), mat_result.data.get() + mat_result.size(), result_slice.data.get());
 
-                for (int dim = batch_result_shape.size() - 1; dim >= 0; --dim) {
-                    idx[dim]++;
-                    if (idx[dim] < batch_result_shape[dim])
-                        break;
-                    idx[dim] = 0;
-                }
+                std::copy(mat_result.data.get(), mat_result.data.get() + mat_result.size(), result_slice.data.get());
             }
             return result;
         }
