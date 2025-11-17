@@ -1,5 +1,6 @@
 #include <cassert>
 #include <functional>
+#include <iostream>
 
 inline std::string to_string_vec(const std::vector<size_t>& vec) {
     std::ostringstream oss;
@@ -476,7 +477,7 @@ namespace blass {
 
             if (batch_a_shape.size() == 0)
                 batch_a_shape.push_back(1);
-            
+
             if (batch_b_shape.size() == 0)
                 batch_b_shape.push_back(1);
             
@@ -536,11 +537,6 @@ namespace blass {
 
                 Tensor<T> mat_result = matmul_2d(a_slice, b_slice, !use_omp_batch);
                 
-                std::cout << "A slice value: " << a_slice.to_string() << "\n";
-                std::cout << "B slice value: " << b_slice.to_string() << "\n";
-
-                std::cout << "Mat result shape: " << to_string_vec(mat_result.get_shape()) << "\n";
-                std::cout << "Mat result value:" << mat_result.to_string() << "\n";
                 std::copy(mat_result.data.get(), mat_result.data.get() + mat_result.size(), result_slice.data.get());
 
                 for (int dim = batch_result_shape.size() - 1; dim >= 0; --dim) {
