@@ -56,9 +56,9 @@ int main() {
     std::cout << (tensor_a + tensor_b).to_string() << "\n";
     
     // matmul test
-    Tensor<float> mat_a = {{1, 2, 3}, {4, 5, 6}};
+    Tensor<float> mat_a = {{{1, 2, 3}, {4, 5, 6}}, {{1, 0, 0}, {0, 1, 0}}};
     Tensor<float> mat_b = {{7, 8}, {9, 10}, {11, 12}};
-    Tensor<float> mat_result = matmul_2d(mat_a, mat_b);
+    Tensor<float> mat_result = matmul(mat_a, mat_b);
     std::cout << "\nMatrix Multiplication Result:\n" << mat_result.to_string() << "\n";
 
     return 0;

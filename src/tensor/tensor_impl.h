@@ -119,7 +119,6 @@ namespace blass {
         return Tensor<T>(contiguous().data, std::vector<size_t>(final_shape.begin(), final_shape.end()));
     }
 
-    template <typename T>
     std::vector<size_t> broadcast_shape(const std::vector<size_t>& shape_a, const std::vector<size_t>& shape_b) {
         size_t len_a = shape_a.size();
         size_t len_b = shape_b.size();
@@ -255,7 +254,7 @@ namespace blass {
             return result;
         }
         else {
-            std::vector<size_t> result_shape = broadcast_shape<T>(a.get_shape(), b.get_shape());
+            std::vector<size_t> result_shape = broadcast_shape(a.get_shape(), b.get_shape());
             Tensor<T> a_broadcasted = a.broadcast(result_shape);
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
@@ -282,7 +281,7 @@ namespace blass {
             return result;
         }
         else {
-            std::vector<size_t> result_shape = broadcast_shape<T>(a.get_shape(), b.get_shape());
+            std::vector<size_t> result_shape = broadcast_shape(a.get_shape(), b.get_shape());
             Tensor<T> a_broadcasted = a.broadcast(result_shape);
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
@@ -309,7 +308,7 @@ namespace blass {
             return result;
         }
         else {
-            std::vector<size_t> result_shape = broadcast_shape<T>(a.get_shape(), b.get_shape());
+            std::vector<size_t> result_shape = broadcast_shape(a.get_shape(), b.get_shape());
             Tensor<T> a_broadcasted = a.broadcast(result_shape);
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
@@ -336,7 +335,7 @@ namespace blass {
             return result;
         }
         else {
-            std::vector<size_t> result_shape = broadcast_shape<T>(a.get_shape(), b.get_shape());
+            std::vector<size_t> result_shape = broadcast_shape(a.get_shape(), b.get_shape());
             Tensor<T> a_broadcasted = a.broadcast(result_shape);
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
@@ -404,7 +403,7 @@ namespace blass {
     }
 
     template <typename T>
-    Tensor<T> matmul_2d(const Tensor<T> &a, const Tensor<T> &b) {
+    Tensor<T> matmul_2d(const Tensor<T> &a, const Tensor<T> &b, bool use_omp) {
         assert(a.get_shape().size() == 2 && b.get_shape().size() == 2 && "Both tensors must be 2D for matmul_2d");
         assert(a.get_shape(1) == b.get_shape(0) && "Inner dimensions must match for matmul_2d");
 
@@ -417,7 +416,7 @@ namespace blass {
         Tensor<T> b_transposed = b.transpose();
 
         if (m >= p) {
-            #pragma omp parallel for
+            #pragma omp parallel for if (use_omp)
             for (size_t i = 0; i < m; ++i) {
                 T* __restrict__ ptr_res_row = result.data.get() + i * result.strides[0];
                 T* __restrict__ ptr_a_row = a.data.get() + i * a.strides[0];
@@ -436,7 +435,7 @@ namespace blass {
             }
         } 
         else {
-            #pragma omp parallel for
+            #pragma omp parallel for if (use_omp)
             for (size_t j = 0; j < p; ++j) {
                 T* __restrict__ ptr_res_col = result.data.get() + j;
                 T* __restrict__ ptr_b_row = b_transposed.data.get() + j * b_transposed.strides[0];
@@ -460,6 +459,98 @@ namespace blass {
 
     template <typename T>
     Tensor<T> matmul(const Tensor<T> &a, const Tensor<T> &b) {
-        throw std::runtime_error("Generalized matmul not implemented yet.");
+        if (a.shape.size() < 2 || b.shape.size() < 2) {
+            throw std::invalid_argument("Both tensors must be at least 2D for matmul");
+        }
+
+        if (a.shape.size() == 2 && b.shape.size() == 2) {
+            return matmul_2d(a, b);
+        }
+        else {
+            std::vector<size_t> batch_a_shape, batch_b_shape;
+            for (size_t i = 0; i < a.shape.size() - 2; i++)
+                batch_a_shape.push_back(a.shape[i]);
+
+            for (size_t i = 0; i < b.shape.size() - 2; i++)
+                batch_b_shape.push_back(b.shape[i]);
+
+            if (batch_a_shape.size() == 0)
+                batch_a_shape.push_back(1);
+            
+            if (batch_b_shape.size() == 0)
+                batch_b_shape.push_back(1);
+            
+            std::vector<size_t> batch_result_shape = broadcast_shape(batch_a_shape, batch_b_shape);
+            if (a.shape[a.shape.size() - 1] != b.shape[b.shape.size() - 2]) {
+                throw std::invalid_argument("Inner dimensions must match for matmul");
+            }
+
+            std::vector<size_t> a_broadcast_shape = batch_result_shape;
+            a_broadcast_shape.push_back(a.shape[a.shape.size() - 2]);
+            a_broadcast_shape.push_back(a.shape[a.shape.size() - 1]);
+
+            std::vector<size_t> b_broadcast_shape = batch_result_shape;
+            b_broadcast_shape.push_back(b.shape[b.shape.size() - 2]);
+            b_broadcast_shape.push_back(b.shape[b.shape.size() - 1]);
+
+            Tensor<T> a_broadcasted = a.broadcast(a_broadcast_shape);
+            Tensor<T> b_broadcasted = b.broadcast(b_broadcast_shape);
+
+            std::vector<size_t> result_shape = batch_result_shape;
+            result_shape.push_back(a.shape[a.shape.size() - 2]);
+            result_shape.push_back(b.shape[b.shape.size() - 1]);
+
+            Tensor<T> result = Tensor<T>::from_shape(result_shape);
+
+            size_t batch_size = 1;
+
+            for (size_t dim : batch_result_shape)
+                batch_size *= dim;
+
+            std::vector<size_t> idx(batch_result_shape.size(), 0);
+            
+            const auto& sa = a_broadcasted.strides;
+            const auto& sb = b_broadcasted.strides;
+
+            bool use_omp_batch = batch_size >= 32;
+
+            #pragma omp parallel for if(use_omp_batch)
+            for (size_t i = 0; i < batch_size; ++i) {
+                size_t offset_a = 0, offset_b = 0, offset_res = 0;
+                for (size_t dim = 0; dim < batch_result_shape.size(); ++dim) {
+                    offset_a += idx[dim] * sa[dim];
+                    offset_b += idx[dim] * sb[dim];
+                    offset_res += idx[dim] * result.strides[dim];
+                }
+
+                std::shared_ptr<T[]> ptr_a = std::shared_ptr<T[]>(a_broadcasted.data, a_broadcasted.data.get() + offset_a);
+                std::shared_ptr<T[]> ptr_b = std::shared_ptr<T[]>(b_broadcasted.data, b_broadcasted.data.get() + offset_b);
+                std::shared_ptr<T[]> ptr_res = std::shared_ptr<T[]>(result.data, result.data.get() + offset_res);
+
+                Tensor<T> a_slice(ptr_a, 
+                                {a.shape[a.shape.size() - 2], a.shape[a.shape.size() - 1]});
+                Tensor<T> b_slice(ptr_b, 
+                                 {b.shape[b.shape.size() - 2], b.shape[b.shape.size() - 1]});
+                Tensor<T> result_slice(ptr_res, 
+                                      {result_shape[result_shape.size() - 2], result_shape[result_shape.size() - 1]});
+
+                Tensor<T> mat_result = matmul_2d(a_slice, b_slice, !use_omp_batch);
+                
+                std::cout << "A slice value: " << a_slice.to_string() << "\n";
+                std::cout << "B slice value: " << b_slice.to_string() << "\n";
+
+                std::cout << "Mat result shape: " << to_string_vec(mat_result.get_shape()) << "\n";
+                std::cout << "Mat result value:" << mat_result.to_string() << "\n";
+                std::copy(mat_result.data.get(), mat_result.data.get() + mat_result.size(), result_slice.data.get());
+
+                for (int dim = batch_result_shape.size() - 1; dim >= 0; --dim) {
+                    idx[dim]++;
+                    if (idx[dim] < batch_result_shape[dim])
+                        break;
+                    idx[dim] = 0;
+                }
+            }
+            return result;
+        }
     }
 }
