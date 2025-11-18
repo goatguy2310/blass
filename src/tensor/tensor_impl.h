@@ -158,84 +158,129 @@ namespace blass {
         return Tensor<T>(data, target_shape, broadcasted_stride);
     }
     
-    template <char op, typename T>
-    void blass::elementwise_op(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, 
-                               const std::vector<size_t>& shape, size_t dim, size_t offset_a, size_t offset_b, size_t offset_res, bool use_omp) {
-        if (dim == shape.size() - 1 || result.strides[dim] == 1) {
-            T* __restrict__ ptr_a = a.data.get() + offset_a;
-            T* __restrict__ ptr_b = b.data.get() + offset_b;
-            T* __restrict__ ptr_res = result.data.get() + offset_res;
-            assert(a.strides[dim] <= 1 && b.strides[dim] <= 1 && "Strides for innermost dimension should be 0 or 1?");
-
-            bool a_stride = (a.strides[dim] == 1);
-            bool b_stride = (b.strides[dim] == 1);
-
-            bool use_omp_local = use_omp && shape[dim] >= 32;
-
-            if (a_stride && b_stride) {
-                #pragma omp parallel for if(use_omp_local)
-                for (size_t i = 0; i < shape[dim]; i++) {
-                    if constexpr (op == '+')
-                        ptr_res[i] = ptr_a[i] + ptr_b[i];
-                    else if constexpr (op == '-')
-                        ptr_res[i] = ptr_a[i] - ptr_b[i];
-                    else if constexpr (op == '*')
-                        ptr_res[i] = ptr_a[i] * ptr_b[i];
-                    else if constexpr (op == '/')
-                        ptr_res[i] = ptr_a[i] / ptr_b[i];
-                }
+    template<char op, typename T>
+    void blass::elementwise_op(const Tensor<T>& a, const Tensor<T>& b, const Tensor<T>& result, const std::vector<size_t>& shape) {
+        if (shape.size() == 1) {
+            #pragma omp parallel for simd
+            for (size_t i = 0; i < shape[0]; i++) {
+                if constexpr (op == '+')
+                    result.data[i] = a.data[i] + b.data[i];
+                else if constexpr (op == '-')
+                    result.data[i] = a.data[i] - b.data[i];
+                else if constexpr (op == '*')
+                    result.data[i] = a.data[i] * b.data[i];
+                else if constexpr (op == '/')
+                    result.data[i] = a.data[i] / b.data[i];
             }
-
-            if (a_stride && !b_stride) {
-                #pragma omp parallel for if(use_omp_local)
-                for (size_t i = 0; i < shape[dim]; i++) {
-                    if constexpr (op == '+')
-                        ptr_res[i] = ptr_a[i] + ptr_b[0];
-                    else if constexpr (op == '-')
-                        ptr_res[i] = ptr_a[i] - ptr_b[0];
-                    else if constexpr (op == '*')
-                        ptr_res[i] = ptr_a[i] * ptr_b[0];
-                    else if constexpr (op == '/')
-                        ptr_res[i] = ptr_a[i] / ptr_b[0];
-                }
-            }
-
-            if (!a_stride && b_stride) {
-                #pragma omp parallel for if(use_omp_local)
-                for (size_t i = 0; i < shape[dim]; i++) {
-                    if constexpr (op == '+')
-                        ptr_res[i] = ptr_a[0] + ptr_b[i];
-                    else if constexpr (op == '-')
-                        ptr_res[i] = ptr_a[0] - ptr_b[i];
-                    else if constexpr (op == '*')
-                        ptr_res[i] = ptr_a[0] * ptr_b[i];
-                    else if constexpr (op == '/')
-                        ptr_res[i] = ptr_a[0] / ptr_b[i];
-                }
-            }
-
-            if (!a_stride && !b_stride) {
-                #pragma omp parallel for if(use_omp_local)
-                for (size_t i = 0; i < shape[dim]; i++) {
-                    if constexpr (op == '+')
-                        ptr_res[i] = ptr_a[0] + ptr_b[0];
-                    else if constexpr (op == '-')
-                        ptr_res[i] = ptr_a[0] - ptr_b[0];
-                    else if constexpr (op == '*')
-                        ptr_res[i] = ptr_a[0] * ptr_b[0];
-                    else if constexpr (op == '/')
-                        ptr_res[i] = ptr_a[0] / ptr_b[0];
-                }
-            }
-            return;
         }
+        else {
+            size_t dim_cut = shape.size() - 1;
+            for (size_t i = 0; i < shape.size(); i++) {
+                if (result.strides[i] == 1) {
+                    dim_cut = i;
+                    break;
+                }
+            }
+            std::vector<size_t> batch_shape(shape.begin(), shape.begin() + dim_cut);
 
-        bool use_omp_local = use_omp && (result.strides.back() / result.strides[dim] <= 32 && shape[dim] >= 32);
-        if (use_omp_local) use_omp = 0;
+            size_t batch_size = 1;
+            for (size_t dim : batch_shape) 
+                batch_size *= dim;
 
-        #pragma omp parallel for if(use_omp_local)
-        for (size_t i = 0; i < shape[dim]; i++) {
-            elementwise_op<op>(a, b, result, shape, dim + 1, offset_a + i * a.strides[dim], offset_b + i * b.strides[dim], offset_res + i * result.strides[dim], use_omp);
+            size_t inner_size = 1;
+            for (size_t dim = dim_cut; dim < shape.size(); dim++) 
+                inner_size *= shape[dim];
+            
+            bool omp_batch = batch_size > 16;
+            bool omp_inner = inner_size > 1024 && !omp_batch;
+
+            #pragma omp parallel for schedule(static) if(omp_batch)
+            for (size_t idx = 0; idx < batch_size; idx++) {
+                size_t offset_a = 0, offset_b = 0, offset_res = idx * inner_size;
+                size_t tmp = idx;
+                
+                for (int d = dim_cut - 1; d >= 0; d--) {
+                    size_t idx = tmp % batch_shape[d];
+                    tmp /= batch_shape[d];
+                    offset_a += idx * a.strides[d];
+                    offset_b += idx * b.strides[d];
+                }
+
+                T* __restrict__ ptr_a = a.data.get() + offset_a;
+                T* __restrict__ ptr_b = b.data.get() + offset_b;
+                T* __restrict__ ptr_res = result.data.get() + offset_res;
+
+                bool a_stride = (a.strides[dim_cut] == 1);
+                bool b_stride = (b.strides[dim_cut] == 1);
+
+                if (a_stride && b_stride) {
+                    #pragma omp parallel if(omp_inner)
+                    {
+                        #pragma omp for simd
+                        for (size_t i = 0; i < inner_size; i++) {
+                            if constexpr (op == '+')
+                                ptr_res[i] = ptr_a[i] + ptr_b[i];
+                            else if constexpr (op == '-')
+                                ptr_res[i] = ptr_a[i] - ptr_b[i];
+                            else if constexpr (op == '*')
+                                ptr_res[i] = ptr_a[i] * ptr_b[i];
+                            else if constexpr (op == '/')
+                                ptr_res[i] = ptr_a[i] / ptr_b[i];
+                        }
+                    }
+                }
+
+                if (a_stride && !b_stride) {
+                    #pragma omp parallel if(omp_inner)
+                    {
+                        #pragma omp for simd
+                        for (size_t i = 0; i < inner_size; i++) {
+                            if constexpr (op == '+')
+                                ptr_res[i] = ptr_a[i] + ptr_b[0];
+                            else if constexpr (op == '-')
+                                ptr_res[i] = ptr_a[i] - ptr_b[0];
+                            else if constexpr (op == '*')
+                                ptr_res[i] = ptr_a[i] * ptr_b[0];
+                            else if constexpr (op == '/')
+                                ptr_res[i] = ptr_a[i] / ptr_b[0];
+                        }
+                    }
+                }
+
+                if (!a_stride && b_stride) {
+                    #pragma omp parallel if(omp_inner)
+                    {
+                        #pragma omp for simd
+                        for (size_t i = 0; i < inner_size; i++) {
+                            if constexpr (op == '+')
+                                ptr_res[i] = ptr_a[0] + ptr_b[i];
+                            else if constexpr (op == '-')
+                                ptr_res[i] = ptr_a[0] - ptr_b[i];
+                            else if constexpr (op == '*')
+                                ptr_res[i] = ptr_a[0] * ptr_b[i];
+                            else if constexpr (op == '/')
+                                ptr_res[i] = ptr_a[0] / ptr_b[i];
+                        }
+                    }
+                }
+
+                if (!a_stride && !b_stride) {
+                    #pragma omp parallel if(omp_inner) 
+                    {
+                        #pragma omp for simd
+                        for (size_t i = 0; i < inner_size; i++) {
+                            if constexpr (op == '+')
+                                ptr_res[i] = ptr_a[0] + ptr_b[0];
+                            else if constexpr (op == '-')
+                                ptr_res[i] = ptr_a[0] - ptr_b[0];
+                            else if constexpr (op == '*')
+                                ptr_res[i] = ptr_a[0] * ptr_b[0];
+                            else if constexpr (op == '/')
+                                ptr_res[i] = ptr_a[0] / ptr_b[0];
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -260,7 +305,7 @@ namespace blass {
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
 
-            elementwise_op<'+'> (a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0);
+            elementwise_op<'+'> (a_broadcasted, b_broadcasted, result, result_shape);
 
             return result;
         }
@@ -287,7 +332,7 @@ namespace blass {
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
 
-            elementwise_op<'-'> (a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0);
+            elementwise_op<'-'> (a_broadcasted, b_broadcasted, result, result_shape);
 
             return result;
         }
@@ -314,7 +359,7 @@ namespace blass {
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
 
-            elementwise_op<'*'>(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0);
+            elementwise_op<'*'>(a_broadcasted, b_broadcasted, result, result_shape);
 
             return result;
         }
@@ -341,7 +386,7 @@ namespace blass {
             Tensor<T> b_broadcasted = b.broadcast(result_shape);
             Tensor<T> result = Tensor<T>::from_shape(result_shape);
 
-            elementwise_op<'/'>(a_broadcasted, b_broadcasted, result, result_shape, 0, 0, 0, 0);
+            elementwise_op<'/'>(a_broadcasted, b_broadcasted, result, result_shape);
 
             return result;
         }
