@@ -15,7 +15,11 @@ Basic Linear Algebra Subprogram Simplified
     - [x] Element-wise
     - [x] Broadcasting
     - [ ] Matmul, convolution
-- [ ] Threading
+- [ ] Optimizations for non-contiguous
+    - [ ] Remove recursion
+    - [ ] Coalesce (flattening)
+    - [ ] Permute (find dimension of size 1)
+- [ ] Template functions for ops and strides
 - [ ] Autograd
 
 ### Graph compiler (to optimize autograd graph)
