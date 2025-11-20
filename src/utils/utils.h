@@ -17,4 +17,18 @@ std::string to_string_vec(const std::vector<size_t>& vec) {
     oss << "]";
     return oss.str();
 }
+
+template <char op, typename T>
+T scalar_op(const T a, const T b) {
+    if constexpr (op == '+')
+        return a + b;
+    else if constexpr (op == '-')
+        return  a - b;
+    else if constexpr (op == '*')
+        return a * b;
+    else if constexpr (op == '/')
+        return a / b;
+
+    throw std::invalid_argument("Unsupported operation");
+}
 }

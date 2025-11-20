@@ -110,4 +110,27 @@ namespace blass {
         }
         return Tensor<T>(data, std::vector<size_t>(final_shape.begin(), final_shape.end()));
     }
+
+    template <typename T>
+    Tensor<T> Tensor<T>::clone() const {
+        Tensor<T> result(shape);
+        if (is_contiguous()) {
+            std::copy(data.get(), data.get() + sz, result.data.get());
+            return result;
+        } else {
+            for (size_t idx = 0; idx < sz; idx++) {
+                size_t offset = 0;
+                size_t tmp = idx;
+
+                for (int d = shape.size() - 1; d >= 0; --d) {
+                    size_t dim_idx = tmp % shape[d];
+                    tmp /= shape[d];
+                    offset += dim_idx * strides[d];
+                }
+                result.data[idx] = data[offset];
+            }
+
+            return result;
+        }
+    }
 }

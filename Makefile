@@ -4,11 +4,24 @@ CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -march=native -fopenmp
 
 BUILD = build
-BENCH = build/bench
 
 SRC = $(wildcard src/*.cpp)
 OBJ = $(patsubst src/%.cpp, $(BUILD)/%.o, $(SRC))
 DEPS = $(OBJ:.o=.d)
+
+# --------------- TESTING ----------------
+
+TESTS = build/tests
+
+TESTSRC = $(wildcard tests/*.cpp)
+TESTOBJ = $(patsubst tests/%.cpp, $(TESTS)/%.o, $(TESTSRC))
+TESTTARGETS = $(patsubst tests/%.cpp, $(TESTS)/%, $(TESTSRC))
+TESTNAMES = $(notdir $(TESTTARGETS))
+TESTFLAGS = -lgtest_main -lgtest -lpthread
+
+# --------------- BENCHMARKING ----------------
+
+BENCH = build/bench
 
 BMSRC = $(wildcard bench/*.cpp)
 BMOBJ = $(patsubst bench/%.cpp, $(BENCH)/%.o, $(BMSRC))
@@ -18,7 +31,9 @@ BMFLAGS = -lbenchmark -lpthread
 
 TARGET = $(BUILD)/main
 
-.PHONY: all bench clean $(BMNAMES)
+.PHONY: all bench $(BMNAMES) tests $(TESTNAMES) clean
+
+all: $(TARGET)
 
 build:
 	@mkdir -p build
@@ -26,7 +41,8 @@ build:
 build/bench:
 	@mkdir -p build/bench
 
-all: $(TARGET)
+build/tests:
+	@mkdir -p build/tests
 
 $(TARGET): $(OBJ)
 	@echo "Linking $@"
@@ -35,6 +51,27 @@ $(TARGET): $(OBJ)
 $(BUILD)/%.o: src/%.cpp | build
 	@echo "Compiling $<"
 	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
+
+# --------------- TESTING ----------------
+
+$(TESTS)/%: $(TESTS)/%.o | build build/tests
+	@echo "Linking test $@"
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(TESTFLAGS)
+
+$(TESTS)/%.o: tests/%.cpp | build build/tests
+	@echo "Compiling $<"
+	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
+
+tests: $(TESTTARGETS) | build build/tests
+	@echo "Running all tests..."
+	@for test in $(TESTTARGETS); do \
+		echo "Executing $$test"; \
+		$$test; \
+	done
+
+$(TESTNAMES): %: $(TESTS)/% | build build/tests
+	@echo "Running test $@"
+	@$(TESTS)/$@
 
 # --------------- BENCHMARKING ----------------
 

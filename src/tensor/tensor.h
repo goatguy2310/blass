@@ -190,16 +190,18 @@ namespace blass {
             return Tensor<T>(slice, new_shape, new_strides);
         }
 
-        Tensor<T> at(const std::vector<size_t>& indices) const {
+        Tensor<T> at(std::initializer_list<size_t> indices) const {
             if (indices.size() > shape.size()) {
                 throw std::out_of_range("Too many indices provided");
             }
             size_t offset = 0;
-            for (size_t i = 0; i < indices.size(); i++) {
-                if (indices[i] >= shape[i]) {
+            auto idx_ptr = indices.begin();
+            for (size_t i = 0; i < indices.size(); ++i) {
+                size_t idx = idx_ptr[i];
+                if (idx >= shape[i]) {
                     throw std::out_of_range("Index out of range at dimension " + std::to_string(i));
                 }
-                offset += indices[i] * strides[i];
+                offset += idx * strides[i];
             }
             std::shared_ptr<T[]> slice(data, data.get() + offset);
             std::vector<size_t> new_shape(shape.begin() + indices.size(), shape.end());
@@ -330,8 +332,10 @@ namespace blass {
         Tensor<T> transpose(const std::vector<size_t>& perm) const;
         Tensor<T> transpose() const;
         Tensor<T> view(const std::vector<int>& new_shape) const;
+        Tensor<T> clone() const;
+
+        // broadcasting and elementwise operations
         Tensor<T> broadcast(const std::vector<size_t>& target_shape) const;
-        
         template <char op, typename U>
         friend Tensor<U> elementwise_op(const Tensor<U>& a, const Tensor<U>& b);
     

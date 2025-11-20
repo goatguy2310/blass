@@ -44,20 +44,6 @@ namespace blass {
         }
         return Tensor<T>(data, target_shape, broadcasted_stride);
     }
-
-    template <char op, typename T>
-    T scalar_op(const T a, const T b) {
-        if constexpr (op == '+')
-            return a + b;
-        else if constexpr (op == '-')
-            return  a - b;
-        else if constexpr (op == '*')
-            return a * b;
-        else if constexpr (op == '/')
-            return a / b;
-
-        throw std::invalid_argument("Unsupported operation");
-    }
     
     template<char op, typename T>
     Tensor<T> blass::elementwise_op(const Tensor<T>& a_raw, const Tensor<T>& b_raw) {
@@ -69,7 +55,7 @@ namespace blass {
         if (shape.size() == 1) {
             #pragma omp parallel for simd
             for (size_t i = 0; i < shape[0]; i++) {
-                result.data[i] = scalar_op<op>(a.data[i], b.data[i]);
+                result.data[i] = utils::scalar_op<op>(a.data[i], b.data[i]);
             }
         }
         else {
@@ -115,24 +101,24 @@ namespace blass {
                 if (a_stride == 1 && b_stride == 1) {
                     #pragma omp simd if (omp_inner)
                     for (size_t i = 0; i < inner_size; i++) {
-                        ptr_res[i] = scalar_op<op>(ptr_a[i], ptr_b[i]);
+                        ptr_res[i] = utils::scalar_op<op>(ptr_a[i], ptr_b[i]);
                     }
                 } else if (a_stride == 1 && b_stride == 0) {
                     T b_val = ptr_b[0];
                     
                     #pragma omp simd if (omp_inner)
                     for (size_t i = 0; i < inner_size; i++) {
-                        ptr_res[i] = scalar_op<op>(ptr_a[i], b_val);
+                        ptr_res[i] = utils::scalar_op<op>(ptr_a[i], b_val);
                     }
                 } else if (a_stride == 0 && b_stride == 1) {
                     T a_val = ptr_a[0];
 
                     #pragma omp simd if (omp_inner)
                     for (size_t i = 0; i < inner_size; i++) {
-                        ptr_res[i] = scalar_op<op>(a_val, ptr_b[i]);
+                        ptr_res[i] = utils::scalar_op<op>(a_val, ptr_b[i]);
                     }
                 } else if (a_stride == 0 && b_stride == 0) {
-                    T val = scalar_op<op>(ptr_a[0], ptr_b[0]);
+                    T val = utils::scalar_op<op>(ptr_a[0], ptr_b[0]);
 
                     #pragma omp simd if (omp_inner)
                     for (size_t i = 0; i < inner_size; i++) {
@@ -141,7 +127,7 @@ namespace blass {
                 } else {
                     #pragma omp simd if (omp_inner)
                     for (size_t i = 0; i < inner_size; i++) {
-                        ptr_res[i] = scalar_op<op>(ptr_a[i * a_stride], ptr_b[i * b_stride]);
+                        ptr_res[i] = utils::scalar_op<op>(ptr_a[i * a_stride], ptr_b[i * b_stride]);
                     }
                 }
             }

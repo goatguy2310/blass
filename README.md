@@ -34,13 +34,16 @@ To compile main
 make
 ```
 
-To run all benchmarks
+To run all tests & benchmarks
 ```
+make tests
 make bench
 ```
 
-To run individual benchmarks
+To run individual tests & benchmarks
 ```
+make tests_elemwise
+
 make bench_elemwise
 make bench_matmul
 ```
