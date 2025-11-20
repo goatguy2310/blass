@@ -273,7 +273,7 @@ namespace blass {
             return shape.empty();
         }
 
-        std::vector<size_t> get_shape() const {
+        const std::vector<size_t>& get_shape() const {
             return shape;
         }
 
@@ -282,6 +282,25 @@ namespace blass {
                 return shape[dim];
             }
             throw std::out_of_range("Dimension out of range");
+        }
+
+        const std::vector<size_t>& get_strides() const {
+            return strides;
+        }
+
+        size_t get_stride(size_t dim) const {
+            if (dim < strides.size()) {
+                return strides[dim];
+            }
+            throw std::out_of_range("Dimension out of range");
+        }
+
+        const std::shared_ptr<T[]>& get_data_ptr() const {
+            return data;
+        }
+
+        T* get_data() const {
+            return data.get();
         }
 
         size_t size() const {
@@ -314,10 +333,8 @@ namespace blass {
         Tensor<T> broadcast(const std::vector<size_t>& target_shape) const;
         
         template <char op, typename U>
-        friend void elementwise_op(const Tensor<U>& a, const Tensor<U>& b, const Tensor<U>& result, 
-                                   const std::vector<size_t>& shape);
+        friend Tensor<U> elementwise_op(const Tensor<U>& a, const Tensor<U>& b);
     
-
         // arithmetics
         friend Tensor<T> add<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> subtract<>(const Tensor<T>& a, const Tensor<T>& b);
@@ -340,4 +357,5 @@ namespace blass {
     };
 }
 
+#include "tensor_op.h"
 #include "tensor_impl.h"
