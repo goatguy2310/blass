@@ -70,7 +70,7 @@ namespace blass {
             result.shape[i] = shape[perm[i]];
             result.strides[i] = strides[perm[i]];
         }
-        return result;
+        return result.contiguous();
     }
 
     template <typename T>
@@ -108,7 +108,7 @@ namespace blass {
         } else if (new_sz != sz) {
             throw std::invalid_argument("Total size must remain unchanged in view");
         }
-        return Tensor<T>(data, std::vector<size_t>(final_shape.begin(), final_shape.end()));
+        return Tensor<T>(contiguous().data, std::vector<size_t>(final_shape.begin(), final_shape.end()));
     }
 
     template <typename T>

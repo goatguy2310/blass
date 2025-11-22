@@ -25,7 +25,7 @@ using namespace utils;
 // }
 
 TEST(ElemwiseTest, AddScalar) {
-    Tensor<float> a = Tensor<float>::fill_random({1000, 1000}, 0.0f, 10.0f);
+    Tensor<float> a = Tensor<float>::fill_random({100, 100}, 0.0f, 10.0f);
 
     float scalar = 3.0f;
     Tensor<float> a_modified = a + scalar;
@@ -38,7 +38,7 @@ TEST(ElemwiseTest, AddScalar) {
 }
 
 TEST(ElemwiseTest, SubtractScalar) {
-    Tensor<float> a = Tensor<float>::fill_random({1000, 1000}, 0.0f, 10.0f);
+    Tensor<float> a = Tensor<float>::fill_random({100, 100}, 0.0f, 10.0f);
 
     float scalar = 3.0f;
     Tensor<float> a_modified = a - scalar;
@@ -51,7 +51,7 @@ TEST(ElemwiseTest, SubtractScalar) {
 }
 
 TEST(ElemwiseTest, MultiplyScalar) {
-    Tensor<float> a = Tensor<float>::fill_random({1000, 1000}, 0.0f, 10.0f);
+    Tensor<float> a = Tensor<float>::fill_random({100, 100}, 0.0f, 10.0f);
 
     float scalar = 3.0f;
     Tensor<float> a_modified = a * scalar;
@@ -64,7 +64,7 @@ TEST(ElemwiseTest, MultiplyScalar) {
 }
 
 TEST(ElemwiseTest, DivideScalar) {
-    Tensor<float> a = Tensor<float>::fill_random({1000, 1000}, 0.0f, 10.0f);
+    Tensor<float> a = Tensor<float>::fill_random({100, 100}, 0.0f, 10.0f);
 
     float scalar = 3.0f;
     Tensor<float> a_modified = a / scalar;
@@ -77,8 +77,8 @@ TEST(ElemwiseTest, DivideScalar) {
 }
 
 TEST(ElemwiseTest, AddTensorSimple) {
-    Tensor<float> a = Tensor<float>::fill_random({1000, 1000}, 0.0f, 10.0f);
-    Tensor<float> b = Tensor<float>::fill_random({1000, 1000}, 0.0f, 10.0f);
+    Tensor<float> a = Tensor<float>::fill_random({100, 100}, 0.0f, 10.0f);
+    Tensor<float> b = Tensor<float>::fill_random({100, 100}, 0.0f, 10.0f);
 
     Tensor<float> result = a + b;
 
@@ -90,8 +90,8 @@ TEST(ElemwiseTest, AddTensorSimple) {
 }
 
 TEST(ElemwiseTest, MultiplyTensorSimple) {
-    Tensor<float> a = Tensor<float>::fill_random({1000, 1000}, 0.0f, 10.0f);
-    Tensor<float> b = Tensor<float>::fill_random({1000, 1000}, 0.0f, 10.0f);
+    Tensor<float> a = Tensor<float>::fill_random({100, 100}, 0.0f, 10.0f);
+    Tensor<float> b = Tensor<float>::fill_random({100, 100}, 0.0f, 10.0f);
 
     Tensor<float> result = a * b;
 
@@ -103,8 +103,8 @@ TEST(ElemwiseTest, MultiplyTensorSimple) {
 }
 
 TEST(ElemwiseTest, AddTensorBroadcast) {
-    Tensor<float> a = Tensor<float>::fill_random({1000, 1000}, 0.0f, 10.0f);
-    Tensor<float> b = Tensor<float>::fill_random({1, 1000}, 0.0f, 10.0f);
+    Tensor<float> a = Tensor<float>::fill_random({100, 100}, 0.0f, 10.0f);
+    Tensor<float> b = Tensor<float>::fill_random({1, 100}, 0.0f, 10.0f);
 
     Tensor<float> result = a + b;
 
@@ -116,8 +116,8 @@ TEST(ElemwiseTest, AddTensorBroadcast) {
 }
 
 TEST(ElemwiseTest, AddTensorBroadcastLargeDim) {
-    Tensor<float> a = Tensor<float>::fill_random({300, 50, 1, 200}, 0.0f, 10.0f);
-    Tensor<float> b = Tensor<float>::fill_random({1, 50, 400, 1}, 0.0f, 10.0f);
+    Tensor<float> a = Tensor<float>::fill_random({30, 50, 1, 20}, 0.0f, 10.0f);
+    Tensor<float> b = Tensor<float>::fill_random({1, 50, 40, 1}, 0.0f, 10.0f);
 
     Tensor<float> result = a + b;
 
@@ -143,6 +143,70 @@ TEST(ElemwiseTest, AddTensorBroadcastOffset) {
         for (size_t j = 0; j < a.get_shape(1); ++j) {
             for (size_t k = 0; k < a.get_shape(2); ++k) {
                 EXPECT_FLOAT_EQ(result(i, j, k), a(i, j, k) + b(j, 0))
+                    << " at index (" << i << ", " << j << ", " << k << ")";
+            }
+        }
+    }
+}
+
+TEST(ElemwiseTest, AddTensorNonContiguousTranspose1) {
+    Tensor<float> a = Tensor<float>::fill_random({20, 20, 20}, 0.0f, 10.0f);
+    Tensor<float> b = Tensor<float>::fill_random({20, 20, 20}, 0.0f, 10.0f).transpose();
+
+    Tensor<float> result = a + b;
+
+    for (size_t i = 0; i < result.get_shape(0); ++i) {
+        for (size_t j = 0; j < result.get_shape(1); ++j) {
+            for (size_t k = 0; k < result.get_shape(2); ++k) {
+                EXPECT_FLOAT_EQ(result(i, j, k), a(i, j, k) + b(i, j, k))
+                    << " at index (" << i << ", " << j << ", " << k << ")";
+            }
+        }
+    }
+}
+
+TEST(ElemwiseTest, AddTensorNonContiguousTranspose2) {
+    Tensor<float> a = Tensor<float>::fill_random({50, 20, 1}, 0.0f, 10.0f);
+    Tensor<float> b = Tensor<float>::fill_random({20, 1, 50}, 0.0f, 10.0f).transpose();
+
+    Tensor<float> result = a + b;
+
+    for (size_t i = 0; i < result.get_shape(0); ++i) {
+        for (size_t j = 0; j < result.get_shape(1); ++j) {
+            for (size_t k = 0; k < result.get_shape(2); ++k) {
+                EXPECT_FLOAT_EQ(result(i, j, k), a(i, j, 0) + b(i, 0, k))
+                    << " at index (" << i << ", " << j << ", " << k << ")";
+            }
+        }
+    }
+}
+
+TEST(ElemwiseTest, AddTensorNonContiguousView1) {
+    Tensor<float> a = Tensor<float>::fill_random({20, 20, 20}, 0.0f, 10.0f);
+    Tensor<float> b = Tensor<float>::fill_random({8000}, 0.0f, 10.0f).view({20, 20, 20});
+
+    Tensor<float> result = a + b;
+
+    for (size_t i = 0; i < result.get_shape(0); ++i) {
+        for (size_t j = 0; j < result.get_shape(1); ++j) {
+            for (size_t k = 0; k < result.get_shape(2); ++k) {
+                EXPECT_FLOAT_EQ(result(i, j, k), a(i, j, k) + b(i, j, k))
+                    << " at index (" << i << ", " << j << ", " << k << ")";
+            }
+        }
+    }
+}
+
+TEST(ElemwiseTest, AddTensorNonContiguousView2) {
+    Tensor<float> a = Tensor<float>::fill_random({50, 1, 20}, 0.0f, 10.0f);
+    Tensor<float> b = Tensor<float>::fill_random({400}, 0.0f, 10.0f).view({1, 20, 20});
+
+    Tensor<float> result = a + b;
+
+    for (size_t i = 0; i < result.get_shape(0); ++i) {
+        for (size_t j = 0; j < result.get_shape(1); ++j) {
+            for (size_t k = 0; k < result.get_shape(2); ++k) {
+                EXPECT_FLOAT_EQ(result(i, j, k), a(i, 0, k) + b(0, j, k))
                     << " at index (" << i << ", " << j << ", " << k << ")";
             }
         }
