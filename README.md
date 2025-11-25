@@ -16,7 +16,7 @@ Basic Linear Algebra Subprogram Simplified
     - [x] Broadcasting
     - [ ] Matmul, convolution
 - [ ] Optimizations for non-contiguous
-    - [ ] Remove recursion
+    - [x] Remove recursion
     - [ ] Coalesce (flattening)
     - [ ] Permute (find dimension of size 1)
 - [ ] Template functions for ops and strides

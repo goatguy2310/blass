@@ -349,84 +349,83 @@ namespace blass {
         if (a.shape.size() == 2 && b.shape.size() == 2) {
             return matmul_2d(a, b);
         }
-        else {
-            std::vector<size_t> batch_a_shape, batch_b_shape;
-            for (size_t i = 0; i < a.shape.size() - 2; i++)
-                batch_a_shape.push_back(a.shape[i]);
 
-            for (size_t i = 0; i < b.shape.size() - 2; i++)
-                batch_b_shape.push_back(b.shape[i]);
+        std::vector<size_t> batch_a_shape, batch_b_shape;
+        for (size_t i = 0; i < a.shape.size() - 2; i++)
+            batch_a_shape.push_back(a.shape[i]);
 
-            if (batch_a_shape.size() == 0)
-                batch_a_shape.push_back(1);
+        for (size_t i = 0; i < b.shape.size() - 2; i++)
+            batch_b_shape.push_back(b.shape[i]);
 
-            if (batch_b_shape.size() == 0)
-                batch_b_shape.push_back(1);
-            
-            std::vector<size_t> batch_result_shape = broadcast_shape(batch_a_shape, batch_b_shape);
-            if (a.shape[a.shape.size() - 1] != b.shape[b.shape.size() - 2]) {
-                throw std::invalid_argument("Inner dimensions must match for matmul");
-            }
+        if (batch_a_shape.size() == 0)
+            batch_a_shape.push_back(1);
 
-            std::vector<size_t> a_broadcast_shape = batch_result_shape;
-            a_broadcast_shape.push_back(a.shape[a.shape.size() - 2]);
-            a_broadcast_shape.push_back(a.shape[a.shape.size() - 1]);
-
-            std::vector<size_t> b_broadcast_shape = batch_result_shape;
-            b_broadcast_shape.push_back(b.shape[b.shape.size() - 2]);
-            b_broadcast_shape.push_back(b.shape[b.shape.size() - 1]);
-
-            Tensor<T> a_broadcasted = a.broadcast(a_broadcast_shape);
-            Tensor<T> b_broadcasted = b.broadcast(b_broadcast_shape);
-
-            std::vector<size_t> result_shape = batch_result_shape;
-            result_shape.push_back(a.shape[a.shape.size() - 2]);
-            result_shape.push_back(b.shape[b.shape.size() - 1]);
-
-            Tensor<T> result = Tensor<T>::from_shape(result_shape);
-
-            size_t batch_size = 1;
-
-            for (size_t dim : batch_result_shape)
-                batch_size *= dim;
-
-            size_t batch_stride = a.shape[a.shape.size() - 2] * b.shape[b.shape.size() - 1];
-            
-            const auto& sa = a_broadcasted.strides;
-            const auto& sb = b_broadcasted.strides;
-
-            bool use_omp_batch = batch_size >= 32;
-
-            #pragma omp parallel for if(use_omp_batch)
-            for (size_t i = 0; i < batch_size; ++i) {
-                std::vector<size_t> idx(batch_result_shape.size(), 0);
-
-                size_t tmp = i;
-                size_t offset_a = 0, offset_b = 0;
-                for (int dim = batch_result_shape.size() - 1; dim >= 0; --dim) {
-                    size_t idx = tmp % batch_result_shape[dim];
-                    offset_a += idx * sa[dim];
-                    offset_b += idx * sb[dim];
-                    tmp /= batch_result_shape[dim];
-                }
-
-                std::shared_ptr<T[]> ptr_a = std::shared_ptr<T[]>(a_broadcasted.data, a_broadcasted.data.get() + offset_a);
-                std::shared_ptr<T[]> ptr_b = std::shared_ptr<T[]>(b_broadcasted.data, b_broadcasted.data.get() + offset_b);
-                T* __restrict__ ptr_res = result.data.get() + i * batch_stride;
-
-                Tensor<T> a_slice(ptr_a, 
-                                {a.shape[a.shape.size() - 2], a.shape[a.shape.size() - 1]});
-                Tensor<T> b_slice(ptr_b, 
-                                 {b.shape[b.shape.size() - 2], b.shape[b.shape.size() - 1]});
-
-                Tensor<T> mat_result = matmul_2d(a_slice, b_slice, !use_omp_batch);
-                T* __restrict__ mat_result_ptr = mat_result.data.get();
-                
-                #pragma omp simd
-                for (size_t j = 0; j < mat_result.size(); ++j)
-                    ptr_res[j] = mat_result_ptr[j];
-            }
-            return result;
+        if (batch_b_shape.size() == 0)
+            batch_b_shape.push_back(1);
+        
+        std::vector<size_t> batch_result_shape = broadcast_shape(batch_a_shape, batch_b_shape);
+        if (a.shape[a.shape.size() - 1] != b.shape[b.shape.size() - 2]) {
+            throw std::invalid_argument("Inner dimensions must match for matmul");
         }
+
+        std::vector<size_t> a_broadcast_shape = batch_result_shape;
+        a_broadcast_shape.push_back(a.shape[a.shape.size() - 2]);
+        a_broadcast_shape.push_back(a.shape[a.shape.size() - 1]);
+
+        std::vector<size_t> b_broadcast_shape = batch_result_shape;
+        b_broadcast_shape.push_back(b.shape[b.shape.size() - 2]);
+        b_broadcast_shape.push_back(b.shape[b.shape.size() - 1]);
+
+        Tensor<T> a_broadcasted = a.broadcast(a_broadcast_shape);
+        Tensor<T> b_broadcasted = b.broadcast(b_broadcast_shape);
+
+        std::vector<size_t> result_shape = batch_result_shape;
+        result_shape.push_back(a.shape[a.shape.size() - 2]);
+        result_shape.push_back(b.shape[b.shape.size() - 1]);
+
+        Tensor<T> result = Tensor<T>::from_shape(result_shape);
+
+        size_t batch_size = 1;
+
+        for (size_t dim : batch_result_shape)
+            batch_size *= dim;
+
+        size_t batch_stride = a.shape[a.shape.size() - 2] * b.shape[b.shape.size() - 1];
+        
+        const auto& sa = a_broadcasted.strides;
+        const auto& sb = b_broadcasted.strides;
+
+        bool use_omp_batch = batch_size >= 32;
+
+        #pragma omp parallel for if(use_omp_batch)
+        for (size_t i = 0; i < batch_size; ++i) {
+            std::vector<size_t> idx(batch_result_shape.size(), 0);
+
+            size_t tmp = i;
+            size_t offset_a = 0, offset_b = 0;
+            for (int dim = batch_result_shape.size() - 1; dim >= 0; --dim) {
+                size_t idx = tmp % batch_result_shape[dim];
+                offset_a += idx * sa[dim];
+                offset_b += idx * sb[dim];
+                tmp /= batch_result_shape[dim];
+            }
+
+            std::shared_ptr<T[]> ptr_a = std::shared_ptr<T[]>(a_broadcasted.data, a_broadcasted.data.get() + offset_a);
+            std::shared_ptr<T[]> ptr_b = std::shared_ptr<T[]>(b_broadcasted.data, b_broadcasted.data.get() + offset_b);
+            T* __restrict__ ptr_res = result.data.get() + i * batch_stride;
+
+            Tensor<T> a_slice(ptr_a, 
+                            {a.shape[a.shape.size() - 2], a.shape[a.shape.size() - 1]});
+            Tensor<T> b_slice(ptr_b, 
+                                {b.shape[b.shape.size() - 2], b.shape[b.shape.size() - 1]});
+
+            Tensor<T> mat_result = matmul_2d(a_slice, b_slice, !use_omp_batch);
+            T* __restrict__ mat_result_ptr = mat_result.data.get();
+            
+            #pragma omp simd
+            for (size_t j = 0; j < mat_result.size(); ++j)
+                ptr_res[j] = mat_result_ptr[j];
+        }
+        return result;
     }
 }
