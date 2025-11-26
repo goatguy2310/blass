@@ -75,19 +75,19 @@ BENCHMARK(BM_ElemwiseAddScalar)->Args({(int)1e8, (int)1})
                          ->Args({(int)1, (int)1e8})
                          ->Args({10000, 10000})
                          ->Args({100, 1000000})
-                         ->Args({1000000, 100})->Unit(benchmark::kMillisecond)->Iterations(5);
+                         ->Args({1000000, 100})->Unit(benchmark::kMillisecond)->Iterations(5)->UseRealTime();
 BENCHMARK(BM_ElemwiseMulScalar)->Args({(int)1e8, (int)1})
                          ->Args({(int)1, (int)1e8})
                          ->Args({10000, 10000})
                          ->Args({100, 1000000})
-                         ->Args({1000000, 100})->Unit(benchmark::kMillisecond)->Iterations(5);
+                         ->Args({1000000, 100})->Unit(benchmark::kMillisecond)->Iterations(5)->UseRealTime();
 BENCHMARK(BM_ElemwiseAddSimple)->Args({200, 200, 200})
                                  ->Args({500, 500, 500})
-                                 ->Args({1000, 1000, 1000})->Unit(benchmark::kMillisecond)->Iterations(5);
+                                 ->Args({1000, 1000, 1000})->Unit(benchmark::kMillisecond)->Iterations(5)->UseRealTime();
 BENCHMARK(BM_ElemwiseAddBroadcast)->Args({200, 200, 200})
                                  ->Args({500, 500, 500})
-                                 ->Args({1000, 1000, 1000})->Unit(benchmark::kMillisecond)->Iterations(5);
+                                 ->Args({1000, 1000, 1000})->Unit(benchmark::kMillisecond)->Iterations(5)->UseRealTime();
 BENCHMARK(BM_ElemwiseAddNonContiguous)->Args({200, 200, 200})
                                      ->Args({500, 500, 500})
-                                     ->Args({1000, 1000, 1000})->Unit(benchmark::kMillisecond)->Iterations(5);
+                                     ->Args({1000, 1000, 1000})->Unit(benchmark::kMillisecond)->Iterations(5)->UseRealTime();
 BENCHMARK_MAIN();

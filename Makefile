@@ -28,6 +28,9 @@ BMOBJ = $(patsubst bench/%.cpp, $(BENCH)/%.o, $(BMSRC))
 BMTARGETS = $(patsubst bench/%.cpp, $(BENCH)/%, $(BMSRC))
 BMNAMES = $(notdir $(BMTARGETS))
 BMFLAGS = -lbenchmark -lpthread
+BMEXEFLAGS = --benchmark_repetitions=10 --benchmark_display_aggregates_only=true \
+		--benchmark_out=results/benchmark_results.json --benchmark_out_format=json \
+		--benchmark_counters_tabular=true
 
 TARGET = $(BUILD)/main
 
@@ -43,6 +46,9 @@ build/bench:
 
 build/tests:
 	@mkdir -p build/tests
+
+results:
+	@mkdir -p results
 
 $(TARGET): $(OBJ)
 	@echo "Linking $@"
@@ -83,16 +89,16 @@ $(BENCH)/%.o: bench/%.cpp | build build/bench
 	@echo "Compiling $<"
 	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
 
-bench: $(BMTARGETS) | build build/bench
+bench: $(BMTARGETS) | build build/bench results
 	@echo "Running all benchmarks..."
 	@for bm in $(BMTARGETS); do \
 		echo "Executing $$bm"; \
-		$$bm; \
+		$$bm $(BMEXEFLAGS); \
 	done
 
-$(BMNAMES): %: $(BENCH)/% | build build/bench
+$(BMNAMES): %: $(BENCH)/% | build build/bench results
 	@echo "Running benchmark $@"
-	@$(BENCH)/$@
+	@$(BENCH)/$@ $(BMEXEFLAGS)
 
 clean:
 	rm -rf $(BUILD)

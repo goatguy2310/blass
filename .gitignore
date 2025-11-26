@@ -40,8 +40,9 @@
 # debug information files
 *.dwo
 
-# Build dir
+# Build and results dir
 build/
+results/
 
 # VSCode settings
 .vscode/

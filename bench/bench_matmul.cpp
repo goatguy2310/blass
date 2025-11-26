@@ -47,14 +47,14 @@ static void BM_Matmul_Broadcast(benchmark::State& state) {
 BENCHMARK(BM_Matmul2D_Square)->Args({256})
                                  ->Args({512})
                                  ->Args({1024})
-                                 ->Args({2048})->Unit(benchmark::kMillisecond)->Iterations(5);
+                                 ->Args({2048})->Unit(benchmark::kMillisecond)->UseRealTime();
 BENCHMARK(BM_Matmul2D_Rectangular)->Args({256, 512, 128})
                                     ->Args({512, 256, 1024})
                                     ->Args({1024, 512, 2048})
                                     ->Args({2048, 1024, 4096})
                                     ->Args({1, 100000000, 1})
-                                    ->Args({10000, 1, 10000})->Unit(benchmark::kMillisecond)->Iterations(5);
+                                    ->Args({10000, 1, 10000})->Unit(benchmark::kMillisecond)->UseRealTime();
 BENCHMARK(BM_Matmul_Broadcast)->Args({10, 256, 512, 128})
                                 ->Args({20, 512, 256, 1024})
-                                ->Args({30, 1024, 512, 2048})->Unit(benchmark::kMillisecond)->Iterations(5);
+                                ->Args({30, 1024, 512, 2048})->Unit(benchmark::kMillisecond)->UseRealTime();
 BENCHMARK_MAIN();
