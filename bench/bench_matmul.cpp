@@ -44,17 +44,22 @@ static void BM_Matmul_Broadcast(benchmark::State& state) {
     state.SetItemsProcessed(state.iterations() * batch_size * M * K * N);
 }
 
-BENCHMARK(BM_Matmul2D_Square)->Args({256})
+BENCHMARK(BM_Matmul2D_Square)->Args({8})
+                                 ->Args({16})
+                                 ->Args({256})
                                  ->Args({512})
                                  ->Args({1024})
                                  ->Args({2048})->Unit(benchmark::kMillisecond)->UseRealTime();
-BENCHMARK(BM_Matmul2D_Rectangular)->Args({256, 512, 128})
+BENCHMARK(BM_Matmul2D_Rectangular)->Args({8, 4, 8})
+                                    ->Args({16, 8, 32})
+                                    ->Args({256, 512, 128})
                                     ->Args({512, 256, 1024})
                                     ->Args({1024, 512, 2048})
                                     ->Args({2048, 1024, 4096})
                                     ->Args({1, 100000000, 1})
                                     ->Args({10000, 1, 10000})->Unit(benchmark::kMillisecond)->UseRealTime();
-BENCHMARK(BM_Matmul_Broadcast)->Args({10, 256, 512, 128})
+BENCHMARK(BM_Matmul_Broadcast)->Args({4, 8, 4, 8})
+                                ->Args({10, 256, 512, 128})
                                 ->Args({20, 512, 256, 1024})
                                 ->Args({30, 1024, 512, 2048})->Unit(benchmark::kMillisecond)->UseRealTime();
 BENCHMARK_MAIN();
