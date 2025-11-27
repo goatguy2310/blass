@@ -276,69 +276,48 @@ namespace blass {
         size_t n = a.get_shape(1);
         size_t p = b.get_shape(1);
 
-        Tensor<T> result = Tensor<T>::from_shape({m, p});
+        Tensor<T> result = Tensor<T>::fill({m, p}, static_cast<T>(0));
+        std::fill(result.data.get(), result.data.get() + m * p, T{0});
 
-        Tensor<T> b_transposed = b.transpose(); // assumes transpose does automatic contiguous
+        Tensor<T> b_transposed = b.transpose().contiguous(); // assumes transpose does automatic contiguous
 
-        if (m * p < 32) {
-            for (size_t i = 0; i < m; ++i) {
-                T* __restrict__ ptr_res_row = result.data.get() + i * result.strides[0];
-                T* __restrict__ ptr_a_row = a.data.get() + i * a.strides[0];
+        const size_t a_stride = a.strides[0];
+        const size_t b_stride = b_transposed.strides[0];
 
-                for (size_t j = 0; j < p; ++j) {
-                    T* __restrict__ ptr_b_row = b_transposed.data.get() + j * b_transposed.strides[0];
+        bool large_matrix = (m * n * p) >= 4096;
 
-                    T sum = 0;
+        const size_t BLOCK_SIZE = 32;
 
-                    #pragma omp parallel for simd reduction(+:sum) if (use_omp)
-                    for (size_t k = 0; k < n; ++k)
-                        sum += ptr_a_row[k] * ptr_b_row[k];
+        #pragma omp parallel for collapse(2) if (use_omp && large_matrix)
+        for (size_t i_blk = 0; i_blk < m; i_blk += BLOCK_SIZE) {
+            for (size_t j_blk = 0; j_blk < p; j_blk += BLOCK_SIZE) {
+                for (size_t k_blk = 0; k_blk < n; k_blk += BLOCK_SIZE) {
+                    size_t i_max = std::min(i_blk + BLOCK_SIZE, m);
+                    size_t j_max = std::min(j_blk + BLOCK_SIZE, p);
+                    size_t k_max = std::min(k_blk + BLOCK_SIZE, n);
 
-                    ptr_res_row[j] = sum;
-                }
-            }
-        }
-        else if (m >= p) {
-            #pragma omp parallel for if (use_omp)
-            for (size_t i = 0; i < m; ++i) {
-                T* __restrict__ ptr_res_row = result.data.get() + i * result.strides[0];
-                T* __restrict__ ptr_a_row = a.data.get() + i * a.strides[0];
+                    for (size_t i = i_blk; i < i_max; ++i) {
+                        T* __restrict__ res_row = result.data.get() + i * result.strides[0];
+                        const T* __restrict__ a_row = a.data.get() + i * a_stride;
 
-                for (size_t j = 0; j < p; ++j) {
-                    T* __restrict__ ptr_b_row = b_transposed.data.get() + j * b_transposed.strides[0];
+                        for (size_t j = j_blk; j < j_max; ++j) {
+                            const T* __restrict__ b_row = b_transposed.data.get() + j * b_stride;
+                            T sum = 0;
 
-                    T sum = 0;
-
-                    #pragma omp simd reduction(+:sum)
-                    for (size_t k = 0; k < n; ++k)
-                        sum += ptr_a_row[k] * ptr_b_row[k];
-
-                    ptr_res_row[j] = sum;
-                }
-            }
-        } 
-        else {
-            #pragma omp parallel for if (use_omp)
-            for (size_t j = 0; j < p; ++j) {
-                T* __restrict__ ptr_res_col = result.data.get() + j;
-                T* __restrict__ ptr_b_row = b_transposed.data.get() + j * b_transposed.strides[0];
-                
-                for (size_t i = 0; i < m; ++i) {
-                    T* __restrict__ ptr_a_row = a.data.get() + i * a.strides[0];
-
-                    T sum = 0;
-
-                    #pragma omp simd reduction(+:sum)
-                    for (size_t k = 0; k < n; ++k)
-                        sum += ptr_a_row[k] * ptr_b_row[k];
-
-                    ptr_res_col[i * result.strides[0]] = sum;
+                            #pragma omp simd reduction(+:sum)
+                            for (size_t k = k_blk; k < k_max; ++k) {
+                                sum += a_row[k] * b_row[k];
+                            }
+                            res_row[j] += sum;
+                        }
+                    }
                 }
             }
         }
 
         return result;
     }
+
 
     template <typename T>
     Tensor<T> matmul(const Tensor<T> &a, const Tensor<T> &b) {
