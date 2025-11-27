@@ -286,7 +286,7 @@ namespace blass {
 
         bool large_matrix = (m * n * p) >= 4096;
 
-        const size_t BLOCK_SIZE = 32;
+        const size_t BLOCK_SIZE = 64;
 
         #pragma omp parallel for collapse(2) if (use_omp && large_matrix)
         for (size_t i_blk = 0; i_blk < m; i_blk += BLOCK_SIZE) {
