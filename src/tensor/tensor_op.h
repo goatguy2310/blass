@@ -486,13 +486,15 @@ namespace blass {
                     for (size_t ic = 0; ic < in_channels; ic++) {
                         T* __restrict__ input_ptr = input.data.get() + b * input.strides[0] + ic * input.strides[1];
                         T* __restrict__ kernel_ptr = kernel.data.get() + oc * kernel.strides[0] + ic * kernel.strides[1];
+                        
+                        int offset = static_cast<int>(pad) - ol;
+                        int left = std::max(0, offset);
+                        int right = std::min(static_cast<int>(kernel_size), static_cast<int>(input_length) + offset);
+                        
                         #pragma omp simd
-                        for (size_t k = 0; k < kernel_size; k++) {
-                            int in_idx = static_cast<int>(ol) - pad + static_cast<int>(k);
-                            if (in_idx >= 0 && in_idx < static_cast<int>(input_length)) {
-                                sum += input_ptr[in_idx * input.strides[2]] *
-                                       kernel_ptr[k * kernel.strides[2]];
-                            }
+                        for (size_t k = left; k < static_cast<size_t>(right); k++) {
+                            sum += input_ptr[(-offset + k) * input.strides[2]] *
+                                    kernel_ptr[k * kernel.strides[2]];
                         }
                     }
                     output_ptr[ol * output.strides[2]] = sum;

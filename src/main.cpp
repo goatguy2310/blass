@@ -64,7 +64,7 @@ int main() {
     // convolve1D test
     Tensor<float> input = {{1, 2, 3, 4, 5}, {6, 7, 8, 9, 10}};
     Tensor<float> kernel = {{1, 0, -1}, {0, 1, 0}};
-    Tensor<float> conv_result = convolve1D(input, kernel, true);
+    Tensor<float> conv_result = convolve1D(input, kernel, 0);
     std::cout << "\nConvolution Result:\n" << conv_result.to_string() << "\n";
 
     return 0;
