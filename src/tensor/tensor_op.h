@@ -428,4 +428,86 @@ namespace blass {
         }
         return result;
     }
+
+    template <typename T>
+    Tensor<T> convolve1D(const Tensor<T>& _input, const Tensor<T>& _kernel, bool use_padding) {
+        Tensor<T> input = _input;
+        Tensor<T> kernel = _kernel;
+        if (input.shape.size() > 3 || kernel.shape.size() > 3) {
+            throw std::invalid_argument("Input and kernel must have at most 3 dimensions for convolve1D");
+        }
+
+        bool broadcasted_batch = false, broadcasted_out = false;
+        if (input.shape.size() < 3) {
+            broadcasted_batch = true;
+            if (input.shape.size() == 2) 
+                input = input.broadcast({1, input.shape[0], input.shape[1]});
+            else
+                input = input.broadcast({1, 1, input.shape[0]});
+        }
+
+        if (kernel.shape.size() < 3) {
+            broadcasted_out = true;
+            if (kernel.shape.size() == 2) 
+                kernel = kernel.broadcast({1, kernel.shape[0], kernel.shape[1]});
+            else
+                kernel = kernel.broadcast({1, 1, kernel.shape[0]});
+        }
+
+        size_t batch_size = input.shape[0];
+        size_t in_channels = input.shape[1];
+        size_t input_length = input.shape[2];
+
+        size_t out_channels = kernel.shape[0];
+        size_t kernel_in_channels = kernel.shape[1];
+        size_t kernel_size = kernel.shape[2];
+
+        if (in_channels != kernel_in_channels) {
+            throw std::invalid_argument("Input channels must match kernel input channels for convolve1D");
+        }
+
+        int pad = use_padding ? (kernel_size / 2) : 0;
+        size_t output_length = input_length + 2 * pad - kernel_size + 1;
+
+        Tensor<T> output = Tensor<T>::from_shape({batch_size, out_channels, output_length});
+
+        bool use_omp_batch = batch_size >= 8;
+        bool use_omp_out = out_channels >= 8 && !use_omp_batch;
+
+        #pragma omp parallel for if(use_omp_batch)
+        for (size_t b = 0; b < batch_size; b++) {
+            #pragma omp parallel for if(use_omp_out)
+            for (size_t oc = 0; oc < out_channels; oc++) {
+                T* __restrict__ output_ptr = output.data.get() + b * output.strides[0] + oc * output.strides[1];
+
+                #pragma omp parallel for if(!use_omp_batch && !use_omp_out)
+                for (size_t ol = 0; ol < output_length; ol++) {
+                    T sum = 0;
+                    for (size_t ic = 0; ic < in_channels; ic++) {
+                        T* __restrict__ input_ptr = input.data.get() + b * input.strides[0] + ic * input.strides[1];
+                        T* __restrict__ kernel_ptr = kernel.data.get() + oc * kernel.strides[0] + ic * kernel.strides[1];
+                        #pragma omp simd
+                        for (size_t k = 0; k < kernel_size; k++) {
+                            int in_idx = static_cast<int>(ol) - pad + static_cast<int>(k);
+                            if (in_idx >= 0 && in_idx < static_cast<int>(input_length)) {
+                                sum += input_ptr[in_idx * input.strides[2]] *
+                                       kernel_ptr[k * kernel.strides[2]];
+                            }
+                        }
+                    }
+                    output_ptr[ol * output.strides[2]] = sum;
+                }
+            }
+        }
+        if (broadcasted_batch && broadcasted_out) {
+            return output.view({static_cast<int>(output.shape[2])});
+        } 
+        else if (broadcasted_batch) {
+            return output.view({static_cast<int>(output.shape[1]), static_cast<int>(output.shape[2])});
+        }
+        else if (broadcasted_out) {
+            return output.view({static_cast<int>(output.shape[0]), static_cast<int>(output.shape[2])});
+        } 
+        else return output;
+    }
 }

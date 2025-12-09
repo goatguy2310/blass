@@ -37,6 +37,9 @@ namespace blass {
     template <typename T>
     Tensor<T> matmul_2d(const Tensor<T>& a, const Tensor<T>& b, bool use_omp = true);
 
+    template <typename T>
+    Tensor<T> convolve1D(const Tensor<T>& input, const Tensor<T>& kernel, bool use_padding = 1);
+
     std::vector<size_t> broadcast_shape(const std::vector<size_t>& shape_a, const std::vector<size_t>& shape_b);
     
     template <char op, typename T>
@@ -346,6 +349,7 @@ namespace blass {
         friend Tensor<T> divide<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> matmul<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> matmul_2d<>(const Tensor<T>& a, const Tensor<T>& b, bool use_omp);
+        friend Tensor<T> convolve1D<>(const Tensor<T>& input, const Tensor<T>& kernel, bool use_padding);
 
         Tensor<T> operator+(const Tensor<T>& other) const;
         Tensor<T> operator+(const T& scalar) const;
