@@ -77,6 +77,10 @@ namespace blass {
         if (shape.size() < 2) {
             throw std::invalid_argument("transpose2D can only be called on tensors with at least 2 dimensions.");
         }
+
+        if (!is_contiguous()) {
+            throw std::invalid_argument("Can't perform transpose2D on non-contiguous tensor.");
+        }
         
         size_t batch_size = 1;
         for (size_t i = 0; i + 2 < shape.size(); i++)
@@ -90,33 +94,32 @@ namespace blass {
 
         Tensor<T> result = Tensor<T>::from_shape(new_shape);
 
-        if (rows > cols) {
-            #pragma omp parallel for collapse(2) if(batch_size * cols >= 4)
-            for (size_t b = 0; b < batch_size; b++) {
-                for (size_t c = 0; c < cols; c++) {
-                    T* __restrict__ input_ptr = data.get() + b * rows * cols + c;
-                    T* __restrict__ output_ptr = result.data.get() + b * rows * cols + c * rows;
+        T* __restrict__ inp_data = data.get();
+        T* __restrict__ res_data = result.data.get();
+        
+        const size_t BLOCK_SIZE = 16;
+
+        #pragma omp parallel for collapse(3)
+        for (size_t batch = 0; batch < batch_size; batch++) {
+            for (size_t r_block = 0; r_block < rows; r_block += BLOCK_SIZE)
+                for (size_t c_block = 0; c_block < cols; c_block += BLOCK_SIZE) {
+                    size_t r_block_end = std::min(r_block + BLOCK_SIZE, rows);
+                    size_t c_block_end = std::min(c_block + BLOCK_SIZE, cols);
                     
-                    #pragma omp simd
-                    for (size_t r = 0; r < rows; r++) 
-                        output_ptr[r] = input_ptr[r * cols];
+                    T* __restrict__ inp_ptr = inp_data + batch * rows * cols;
+                    T* __restrict__ res_ptr = res_data + batch * rows * cols;
+
+                    for (size_t j = c_block; j < c_block_end; j++) {
+                        T* __restrict__ res_ptr_col = res_ptr + j * rows; 
+                        T* __restrict__ inp_ptr_col = inp_ptr + j;
+
+                        #pragma omp simd
+                        for (size_t i = r_block; i < r_block_end; i++) 
+                            res_ptr_col[i] = inp_ptr_col[i * cols];
+                    }
                 }
-            }
-            return result;
         }
-        else {
-            #pragma omp parallel for collapse(2) if(batch_size * rows >= 4)
-            for (size_t b = 0; b < batch_size; b++) {
-                for (size_t r = 0; r < rows; r++) {
-                    T* __restrict__ input_ptr = data.get() + b * rows * cols + r * cols;
-                    T* __restrict__ output_ptr = result.data.get() + b * rows * cols + r;
-                    
-                    #pragma omp simd
-                    for (size_t c = 0; c < cols; c++) 
-                        output_ptr[c * rows] = input_ptr[c];
-                }
-            }
-        }
+
         return result;
     }
 

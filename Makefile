@@ -33,28 +33,44 @@ BM_FLAGS = -lbenchmark -lpthread
 BM_EXE_FLAGS = --benchmark_display_aggregates_only=true \
 		--benchmark_out=results/benchmark_results.json --benchmark_out_format=json \
 		--benchmark_min_time=3s --benchmark_counters_tabular=true
-BM_CPU_CORE =
+
+# set to 1 to use all cores, 0 to pin to a single core
+ALL_CORES ?= 0
 
 # try linking with libpfm
 HAS_LIBPFM := $(shell echo "int main() { return 0; }" | $(CXX) -x c++ - -lpfm -o /dev/null 2>/dev/null && echo 1 || echo 0)
 ENABLED_PFM := 0
 
+BM_EXEC_CMD = 
+BM_CPU_CORE = "ALL"
+
 ifeq ($(OS),Windows_NT)
 	BM_EXE_FLAGS += --benchmark_repetitions=10
 else
+	# Linux/Unix Setup
 	ifeq ($(HAS_LIBPFM),1)
 		BM_FLAGS += -lpfm
 		BM_EXE_FLAGS += --benchmark_perf_counters=cycles,instructions,l1-dcache-load-misses
 		ENABLED_PFM := 1
 	endif
 
-	BM_CPU_CORE:=$(shell lscpu -e=CPU,CORE,MAXMHZ | \
-    grep -v "CPU" | \
-    sort -k3,3nr -k2,2nr -k1,1n | \
-    awk '$$2 != 0' | \
-    awk '!seen[$$2]++' | \
-    head -n 1 | \
-    awk '{print $$1}')
+	ifeq ($(ALL_CORES),1)
+		# Case: Use All Cores (Standard Execution)
+		BM_EXEC_CMD = 
+	else
+		# Case: Single Core (Pinning with taskset)
+		# Logic: Find the best core (ignoring hyperthreading, sort by frequency)
+		BM_CPU_CORE := $(shell lscpu -e=CPU,CORE,MAXMHZ | \
+			grep -v "CPU" | \
+			sort -k3,3nr -k2,2nr -k1,1n | \
+			awk '$$2 != 0' | \
+			awk '!seen[$$2]++' | \
+			head -n 1 | \
+			awk '{print $$1}')
+		
+		# Run with high priority on the pinned core
+		BM_EXEC_CMD = sudo nice -n -20 taskset -c $(BM_CPU_CORE)
+	endif
 endif
 
 
@@ -116,31 +132,21 @@ $(BENCH)/%.o: bench/%.cpp | build build/bench
 	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
 
 bench: $(BM_TARGETS) | build build/bench results
-	@echo "Running all benchmarks on core $(BM_CPU_CORE)..."
+	@echo "Running all benchmarks (Cores: $(BM_CPU_CORE))..."
 	@for bm in $(BM_TARGETS); do \
 		echo "Executing $$bm"; \
-		if [ "$(OS)" = "Windows_NT" ]; then \
-			echo "WARNING: Perf counters not supported on Windows. Measuring time only."; \
-			$$bm $(BM_EXE_FLAGS); \
-		else \
-			if [ "$(ENABLED_PFM)" = "0" ]; then \
-				echo "WARNING: libpfm not found. Perf counters will be disabled."; \
-			fi; \
-			sudo nice -n -20 taskset -c $(BM_CPU_CORE) $$bm $(BM_EXE_FLAGS); \
+		if [ "$(OS)" != "Windows_NT" ] && [ "$(ENABLED_PFM)" = "0" ]; then \
+			echo "WARNING: libpfm not found. Perf counters will be disabled."; \
 		fi; \
+		$(BM_EXEC_CMD) $$bm $(BM_EXE_FLAGS); \
 	done
 
 $(BM_NAMES): %: $(BENCH)/% | build build/bench results
-	@echo "Running benchmark $@ on core $(BM_CPU_CORE)..."
-	@if [ "$(OS)" = "Windows_NT" ]; then \
-		echo "WARNING: Perf counters not supported on Windows. Measuring time only."; \
-		$(BENCH)/$@ $(BM_EXE_FLAGS); \
-	else \
-		if [ "$(ENABLED_PFM)" = "0" ]; then \
-			echo "WARNING: libpfm not found. Perf counters will be disabled."; \
-		fi; \
-		sudo nice -n -20 taskset -c $(BM_CPU_CORE) $(BENCH)/$@ $(BM_EXE_FLAGS); \
-	fi
+	@echo "Running benchmark $@ (Cores: $(BM_CPU_CORE))..."
+	@if [ "$(OS)" != "Windows_NT" ] && [ "$(ENABLED_PFM)" = "0" ]; then \
+		echo "WARNING: libpfm not found. Perf counters will be disabled."; \
+	fi; \
+	$(BM_EXEC_CMD) $(BENCH)/$@ $(BM_EXE_FLAGS)
 
 clean:
 	rm -rf $(BUILD)

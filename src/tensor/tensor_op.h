@@ -482,13 +482,12 @@ namespace blass {
 
         Tensor<T> output = Tensor<T>::from_shape({batch_size, out_channels, output_length});
 
-        bool use_omp_batch = batch_size * out_channels >= 8;
+        bool use_omp_batch = batch_size * out_channels >= 4;
 
         #pragma omp parallel for collapse(2) if(use_omp_batch)
         for (size_t b = 0; b < batch_size; b++) {
             for (size_t oc = 0; oc < out_channels; oc++) {
                 T* __restrict__ output_ptr = output.data.get() + b * output.strides[0] + oc * output.strides[1];
-                #pragma omp parallel for if(!use_omp_batch)
                 for (size_t ol = 0; ol < output_length; ol++) {
                     T sum = 0;
 
