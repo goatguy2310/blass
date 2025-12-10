@@ -437,6 +437,14 @@ namespace blass {
             throw std::invalid_argument("Input and kernel must have at most 3 dimensions for convolve1D");
         }
 
+        if (!input.is_contiguous()) {
+            input = input.contiguous();
+        }
+        
+        if (!kernel.is_contiguous()) {
+            kernel = kernel.contiguous();
+        }
+
         bool broadcasted_batch = false, broadcasted_out = false;
         if (input.shape.size() < 3) {
             broadcasted_batch = true;
@@ -462,6 +470,9 @@ namespace blass {
         size_t kernel_in_channels = kernel.shape[1];
         size_t kernel_size = kernel.shape[2];
 
+        input = input.transpose2D();
+        kernel = kernel.transpose2D();
+
         if (in_channels != kernel_in_channels) {
             throw std::invalid_argument("Input channels must match kernel input channels for convolve1D");
         }
@@ -471,36 +482,34 @@ namespace blass {
 
         Tensor<T> output = Tensor<T>::from_shape({batch_size, out_channels, output_length});
 
-        bool use_omp_batch = batch_size >= 8;
-        bool use_omp_out = out_channels >= 8 && !use_omp_batch;
+        bool use_omp_batch = batch_size * out_channels >= 8;
 
-        #pragma omp parallel for if(use_omp_batch)
+        #pragma omp parallel for collapse(2) if(use_omp_batch)
         for (size_t b = 0; b < batch_size; b++) {
-            #pragma omp parallel for if(use_omp_out)
             for (size_t oc = 0; oc < out_channels; oc++) {
                 T* __restrict__ output_ptr = output.data.get() + b * output.strides[0] + oc * output.strides[1];
-
-                #pragma omp parallel for if(!use_omp_batch && !use_omp_out)
+                #pragma omp parallel for if(!use_omp_batch)
                 for (size_t ol = 0; ol < output_length; ol++) {
                     T sum = 0;
-                    for (size_t ic = 0; ic < in_channels; ic++) {
-                        T* __restrict__ input_ptr = input.data.get() + b * input.strides[0] + ic * input.strides[1];
-                        T* __restrict__ kernel_ptr = kernel.data.get() + oc * kernel.strides[0] + ic * kernel.strides[1];
-                        
-                        int offset = static_cast<int>(pad) - ol;
-                        int left = std::max(0, offset);
-                        int right = std::min(static_cast<int>(kernel_size), static_cast<int>(input_length) + offset);
-                        
-                        #pragma omp simd
-                        for (size_t k = left; k < static_cast<size_t>(right); k++) {
-                            sum += input_ptr[(-offset + k) * input.strides[2]] *
-                                    kernel_ptr[k * kernel.strides[2]];
-                        }
+
+                    int offset = (int)pad - (int)ol;
+                    int left = std::max(0, offset);
+                    int right = std::min(static_cast<int>(kernel_size), (int)input_length + (int)offset);
+
+                    T* __restrict__ input_ptr = input.data.get() + b * input.strides[0] + (-offset + left) * in_channels;
+                    T* __restrict__ kernel_ptr = kernel.data.get() + oc * kernel.strides[0] + left * in_channels;
+
+                    int len = (right - left) * in_channels;
+                    #pragma omp simd reduction(+:sum)
+                    for (size_t it = 0; it < (size_t)len; it++) {
+                        sum += input_ptr[it] * kernel_ptr[it];
                     }
+
                     output_ptr[ol * output.strides[2]] = sum;
                 }
             }
         }
+
         if (broadcasted_batch && broadcasted_out) {
             return output.view({static_cast<int>(output.shape[2])});
         } 

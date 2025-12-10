@@ -38,7 +38,6 @@ namespace blass {
 
         #pragma omp parallel 
         {
-            std::vector<size_t> local_multi(ndim);
             #pragma omp for schedule(static)
             for (size_t i = 0; i < total; ++i) {
                 size_t tmp = i;
@@ -71,6 +70,54 @@ namespace blass {
             result.strides[i] = strides[perm[i]];
         }
         return result.contiguous();
+    }
+
+    template <typename T>
+    Tensor<T> Tensor<T>::transpose2D() const {
+        if (shape.size() < 2) {
+            throw std::invalid_argument("transpose2D can only be called on tensors with at least 2 dimensions.");
+        }
+        
+        size_t batch_size = 1;
+        for (size_t i = 0; i + 2 < shape.size(); i++)
+            batch_size *= shape[i];
+        size_t rows = shape[shape.size() - 2];
+        size_t cols = shape[shape.size() - 1];
+        
+        std::vector<size_t> new_shape = shape;
+        new_shape[shape.size() - 2] = cols;
+        new_shape[shape.size() - 1] = rows;
+
+        Tensor<T> result = Tensor<T>::from_shape(new_shape);
+
+        if (rows > cols) {
+            #pragma omp parallel for collapse(2) if(batch_size * cols >= 4)
+            for (size_t b = 0; b < batch_size; b++) {
+                for (size_t c = 0; c < cols; c++) {
+                    T* __restrict__ input_ptr = data.get() + b * rows * cols + c;
+                    T* __restrict__ output_ptr = result.data.get() + b * rows * cols + c * rows;
+                    
+                    #pragma omp simd
+                    for (size_t r = 0; r < rows; r++) 
+                        output_ptr[r] = input_ptr[r * cols];
+                }
+            }
+            return result;
+        }
+        else {
+            #pragma omp parallel for collapse(2) if(batch_size * rows >= 4)
+            for (size_t b = 0; b < batch_size; b++) {
+                for (size_t r = 0; r < rows; r++) {
+                    T* __restrict__ input_ptr = data.get() + b * rows * cols + r * cols;
+                    T* __restrict__ output_ptr = result.data.get() + b * rows * cols + r;
+                    
+                    #pragma omp simd
+                    for (size_t c = 0; c < cols; c++) 
+                        output_ptr[c * rows] = input_ptr[c];
+                }
+            }
+        }
+        return result;
     }
 
     template <typename T>

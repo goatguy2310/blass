@@ -141,7 +141,9 @@ namespace blass {
 
         Tensor(const std::shared_ptr<T[]>& data_, const std::vector<size_t>& shape_, const std::vector<size_t>& strides_)
         : data(data_), shape(shape_), strides(strides_) {
-            sz = strides.empty() ? 1 : strides[0] * shape[0];
+            sz = 1;
+            for (size_t dim : shape)
+                sz *= dim;
         }
 
         template <typename U>
@@ -334,6 +336,7 @@ namespace blass {
         Tensor<T> contiguous() const;
         Tensor<T> transpose(const std::vector<size_t>& perm) const;
         Tensor<T> transpose() const;
+        Tensor<T> transpose2D() const;
         Tensor<T> view(const std::vector<int>& new_shape) const;
         Tensor<T> clone() const;
 
