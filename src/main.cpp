@@ -67,5 +67,9 @@ int main() {
     Tensor<float> conv_result = convolve1D(input, kernel, 0);
     std::cout << "\nConvolution Result:\n" << conv_result.to_string() << "\n";
 
+    // nn operations test
+    input = Tensor<float>({1, 2, 3, 4, 5});
+    std::cout << nn::softmax(input).to_string() << '\n';
+
     return 0;
 }

@@ -11,7 +11,7 @@ namespace blass {
     bool Tensor<T>::is_contiguous() const {
         size_t expected_stride = 1;
         for (int i = shape.size() - 1; i >= 0; i--) {
-            if (strides[i] != expected_stride) {
+            if (strides[i] != expected_stride && shape[i] > 1) {
                 return false;
             }
             expected_stride *= shape[i];
