@@ -3,6 +3,23 @@
 #include "tensor/tensor.h"
 using namespace blass;
 
+class MyModule : public nn::Module<float> {
+public:
+    std::shared_ptr<nn::Softmax<float>> softmax_layer;
+
+    MyModule() {
+        name = "MyModule";
+        softmax_layer = std::make_shared<nn::Softmax<float>>();
+        register_module("softmax", softmax_layer);
+    }
+
+    Tensor<float> forward(const Tensor<float>& input) override {
+        auto output = input * 2.0f + 1.0f;
+        output = (*softmax_layer)(output);
+        return output;
+    }
+};
+
 int main() {
     Tensor<float> tensor = {{1, 2, 3}, {4, 5, 6}};
     Tensor<float> tensor_2 = {{7, 8}, {10, 11}, {13, 14}};
@@ -67,9 +84,11 @@ int main() {
     Tensor<float> conv_result = convolve1D(input, kernel, 0);
     std::cout << "\nConvolution Result:\n" << conv_result.to_string() << "\n";
 
-    // nn operations test
-    input = Tensor<float>({1, 2, 3, 4, 5});
-    std::cout << nn::softmax(input).to_string() << '\n';
+    std::shared_ptr<MyModule> my_module = std::make_shared<MyModule>();
+    Tensor<float> input_tensor = Tensor<float>::fill_random({4, 2}, 0.0f, 1.0f);
+    Tensor<float> output_tensor = (*my_module)(input_tensor);
+    std::cout << "\nInput Tensor:\n" << input_tensor.to_string() << "\n";
+    std::cout << "\nMyModule Output:\n" << output_tensor.to_string() << "\n";
 
     return 0;
 }
