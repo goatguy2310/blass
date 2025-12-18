@@ -18,7 +18,7 @@ namespace blass {
                 for (size_t i = 0; i < batch_size; i++) {
                     T* row = data + i * last_dim;
 
-                    T max_val = std::numeric_limits<T>::lowest();
+                    T max_val = row[0];
                     for (size_t j = 0; j < last_dim; j++)
                         if (max_val < row[j]) max_val = row[j];
 
@@ -77,7 +77,7 @@ namespace blass {
             }
 
             Tensor<T> forward(const Tensor<T>& input) override {
-                Tensor<T> output = matmul(input, weight) ;
+                Tensor<T> output = matmul(input, weight);
                 output = output + bias;
                 return output;
             }
@@ -90,6 +90,62 @@ namespace blass {
 
             Tensor<T> forward(const Tensor<T>& input) override {
                 return functional::softmax(input);
+            }
+        };
+
+        template <typename T>
+        class SiLU : public Module<T> {
+        public:
+            SiLU() {}
+            Tensor<T> forward(const Tensor<T>& input) override {
+                Tensor<T> result = input.clone();
+                T* data = result.get_data();
+                size_t n = result.size();
+
+                #pragma omp parallel for
+                for (size_t i = 0; i < n; i++) {
+                    data[i] = data[i] / (1.0f + std::exp(-data[i]));
+                }
+                return result;
+            }
+        };
+
+        template <typename T>
+        class RMSNorm : public Module<T> {
+        public:
+            Tensor<T> weight;
+            float eps;
+            RMSNorm(int dim, float epsilon=1e-8f) : eps(epsilon) {
+                weight = Tensor<T>::fill_random({dim}, 0.9f, 1.1f);
+                this->register_parameter("weight", weight);
+            }
+
+            Tensor<T> forward(const Tensor<T>& input) override {
+                Tensor<T> result = input.clone();
+                size_t last_dim = result.get_shape().back();
+
+                assert(weight.size() == last_dim && "Weight size must match the last dimension of input");
+                size_t batch_size = result.size() / last_dim;
+
+                T* data = result.get_data();
+                T* weight_data = weight.get_data();
+
+                #pragma omp parallel for
+                for (size_t i = 0; i < batch_size; i++) {
+                    T* row = data + i * last_dim;
+
+                    T rms = 0;
+                    for (size_t j = 0; j < last_dim; j++) {
+                        rms += row[j] * row[j];
+                    }
+                    rms = std::sqrt(rms / last_dim + eps);
+
+                    T inv_rms = static_cast<T>(1.0) / rms;
+                    for (size_t j = 0; j < last_dim; j++) {
+                        row[j] = row[j] * inv_rms * weight_data[j];
+                    }
+                }
+                return result;
             }
         };
     };
