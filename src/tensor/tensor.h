@@ -370,4 +370,3 @@ namespace blass {
 
 #include "tensor_op.h"
 #include "tensor_impl.h"
-#include "nn_op.h"

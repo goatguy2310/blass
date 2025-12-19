@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "tensor/tensor.h"
+#include "nn/modules.h"
 using namespace blass;
 
 class MyModule : public nn::Module<float> {
