@@ -1,6 +1,8 @@
 # blass
 Basic Linear Algebra Subprogram Simplified
 
+\+Basic LLM Inference Engine
+
 ## To-do list
 
 ### Tensor
@@ -10,22 +12,30 @@ Basic Linear Algebra Subprogram Simplified
 - [x] Flatten, reshape, slicing, transpose
 - [ ] Constructors
     - [x] Fill
-    - [ ] Random (+ distributions)
-- [ ] Basic math ops
+    - [ ] Random
+- [x] Basic math ops
     - [x] Element-wise
     - [x] Broadcasting
-    - [ ] Matmul, convolution
+    - [x] Matmul, convolution
 - [ ] Optimizations for non-contiguous
     - [x] Remove recursion
     - [ ] Coalesce (flattening)
     - [ ] Permute (find dimension of size 1)
+    - [ ] Optimize blocking to make it usable
+- [ ] Random module (distribution, seed, etc.)
+- [ ] Model loading
+    - [x] Parsing GGUF file
+    - [ ] Tokenizer library API
+    - [ ] Implementing all NN layers
 - [ ] Template functions for ops and strides
 - [ ] Autograd
 
-### Graph compiler (to optimize autograd graph)
+### Perf measurement
+- [ ] Record useful metrics
+- [ ] Visualization
+
+### Graph compiler (to optimize autograd graph, and maybe inference for ONNX)
 - [ ] Graph
-- [ ] Constant
-- [ ] Whatever
 
 ## Usage
 
