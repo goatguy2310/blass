@@ -37,6 +37,23 @@ namespace blass {
                     throw std::runtime_error("mmap failed");
                 }
             }
+            
+            template<typename T>
+            T read_at(size_t offset) {
+                if (offset + sizeof(T) > size) {
+                    throw std::runtime_error("Read out of bounds in MemoryMappedFile");
+                }
+                T out;
+                std::memcpy(&out, (char*)data + offset, sizeof(T));
+                return out;
+            }
+
+            std::string read_string_at(size_t offset, size_t length) {
+                if (offset + length > size) {
+                    throw std::runtime_error("Read out of bounds in MemoryMappedFile");
+                }
+                return std::string((char*)data + offset, length);
+            }
 
             ~MemoryMappedFile() {
                 if (data != MAP_FAILED) {
@@ -154,97 +171,90 @@ namespace blass {
             > value;
 
             GGUFMetadataValue() {}
-            GGUFMetadataValue(char* data, int &offset, int _type = -1) {
+            GGUFMetadataValue(MemoryMappedFile &file, uint64_t &offset, int _type = -1) {
                 if (_type != -1) {
                     type = (gguf_metadata_value_type)_type;
-                    offset = 0;
                 } 
                 else {
-                    type = *(gguf_metadata_value_type*)data;
-                    offset = 4;
-                    data = (char*)data + 4;
+                    type = file.read_at<gguf_metadata_value_type>(offset);
+                    offset += 4;
                 }
 
                 switch (type) {
                     case GGUF_METADATA_VALUE_TYPE_UINT8: {
+                        value = file.read_at<uint8_t>(offset);
                         offset += 1;
-                        value = *(uint8_t*)data;
                         break;
                     }
                     case GGUF_METADATA_VALUE_TYPE_INT8: {
+                        value = file.read_at<int8_t>(offset);
                         offset += 1;
-                        value = *(int8_t*)data;
                         break;
                     }
                     case GGUF_METADATA_VALUE_TYPE_UINT16: {
+                        value = file.read_at<uint16_t>(offset);
                         offset += 2;
-                        value = *(uint16_t*)data;
                         break;
                     }
                     case GGUF_METADATA_VALUE_TYPE_INT16: {
+                        value = file.read_at<int16_t>(offset);
                         offset += 2;
-                        value = *(int16_t*)data;
                         break;
                     }
                     case GGUF_METADATA_VALUE_TYPE_UINT32: {
+                        value = file.read_at<uint32_t>(offset);
                         offset += 4;
-                        value = *(uint32_t*)data;
                         break;
                     }
                     case GGUF_METADATA_VALUE_TYPE_INT32: {
+                        value = file.read_at<int32_t>(offset);
                         offset += 4;
-                        value = *(int32_t*)data;
                         break;
                     }
                     case GGUF_METADATA_VALUE_TYPE_FLOAT32: {
+                        value = file.read_at<float>(offset);
                         offset += 4;
-                        value = *(float*)data;
                         break;
                     }
                     case GGUF_METADATA_VALUE_TYPE_BOOL: {
+                        value = file.read_at<uint8_t>(offset) != 0;
                         offset += 1;
-                        value = (*(uint8_t*)data) != 0;
                         break;
                     }
                     case GGUF_METADATA_VALUE_TYPE_STRING: {
-                        uint64_t length = *(uint64_t*)data;
-                        offset += 8 + length;
-                        value = std::string(data + 8, length);
+                        uint64_t length = file.read_at<uint64_t>(offset);
+                        offset += 8;
+                        value = file.read_string_at(offset, length);
+                        offset += length;
                         break;
                     }
                     case GGUF_METADATA_VALUE_TYPE_UINT64: {
+                        value = file.read_at<uint64_t>(offset);
                         offset += 8;
-                        value = *(uint64_t*)data;
                         break;
                     }
                     case GGUF_METADATA_VALUE_TYPE_INT64: {
+                        value = file.read_at<int64_t>(offset);
                         offset += 8;
-                        value = *(int64_t*)data;
                         break;
                     }
                     case GGUF_METADATA_VALUE_TYPE_FLOAT64: {
+                        value = file.read_at<double>(offset);
                         offset += 8;
-                        value = *(double*)data;
                         break;
                     }
                     case GGUF_METADATA_VALUE_TYPE_ARRAY: {
-                        gguf_metadata_value_type elem_type = *(gguf_metadata_value_type*)(data);
+                        gguf_metadata_value_type elem_type = file.read_at<gguf_metadata_value_type>(offset);
                         offset += 4;
-                        data += 4;
 
-                        uint64_t length = *(uint64_t*)data;
+                        uint64_t length = file.read_at<uint64_t>(offset);
                         offset += 8;
-                        data += 8;
 
                         std::vector<GGUFMetadataValue> vec;
                         vec.reserve(length);
                         for (uint64_t i = 0; i < length; i++) {
-                            int elem_offset = 0;
-                            GGUFMetadataValue elem;
-                            elem = GGUFMetadataValue(data, elem_offset, elem_type);
+                            GGUFMetadataValue elem(file, offset, elem_type);
                             vec.push_back(elem);
-                            offset += elem_offset;
-                            data += elem_offset;
                         }
                         value = vec;
                         break;
@@ -315,7 +325,7 @@ namespace blass {
             int version;
             uint64_t tensor_count;
             uint64_t kv_count;
-            int current_offset = 24; // after header
+            uint64_t current_offset = 24; // after header
             uint64_t alignment = 1;
 
             std::vector<std::pair<std::string, GGUFMetadataValue>> metadata;
@@ -326,19 +336,17 @@ namespace blass {
             }
 
             void read_metadata_kv() {
-                uint64_t length = *(uint64_t*)((char*)file.data + current_offset);
+                uint64_t length = file.read_at<uint64_t>(current_offset);
                 current_offset += 8;
-                std::string key((char*)file.data + current_offset, length);
+                std::string key = file.read_string_at(current_offset, length);
                 current_offset += length;
 
-                int offset = 0;
-                metadata.push_back({key, GGUFMetadataValue((char*)file.data + current_offset, offset)});
-                current_offset += offset;
+                metadata.push_back({key, GGUFMetadataValue(file, current_offset)});
             }
 
             void load_metadata() {
                 metadata.reserve(kv_count);
-                for (long long i = 0; i < kv_count; i++) {
+                for (uint64_t i = 0; i < kv_count; i++) {
                     read_metadata_kv();
                     std::cout << "Metadata key: " << metadata.back().first 
                             << ", value: " << metadata.back().second.to_string() << std::endl;
@@ -346,23 +354,23 @@ namespace blass {
             }
 
             void read_tensor() {
-                uint64_t name_length = *(uint64_t*)((char*)file.data + current_offset);
+                uint64_t name_length = file.read_at<uint64_t>(current_offset);
                 current_offset += 8;
-                std::string name((char*)file.data + current_offset, name_length);
+                std::string name = file.read_string_at(current_offset, name_length);
                 current_offset += name_length;
                 
                 std::cout << "Reading tensor: " << name << std::endl;
 
-                uint32_t n_dims = *(uint32_t*)((char*)file.data + current_offset);
+                uint32_t n_dims = file.read_at<uint32_t>(current_offset);
                 current_offset += 4;
                 std::vector<uint32_t> dims(n_dims);
 
                 for (uint32_t i = 0; i < n_dims; i++) {
-                    dims[i] = *(uint64_t*)((char*)file.data + current_offset);
+                    dims[i] = file.read_at<uint64_t>(current_offset);
                     current_offset += 8;
                 }
 
-                ggml_type type = *(ggml_type*)((char*)file.data + current_offset);
+                ggml_type type = file.read_at<ggml_type>(current_offset);
                 current_offset += 4;
                 std::cout << "Tensor name: " << name << ", dims: [";
                 for (uint32_t i = 0; i < n_dims; i++) {
@@ -371,7 +379,7 @@ namespace blass {
                 }
                 std::cout << "], type: " << (uint32_t)type << std::endl;
 
-                uint64_t offset = *(uint64_t*)((char*)file.data + current_offset);
+                uint64_t offset = file.read_at<uint64_t>(current_offset);
                 current_offset += 8;
 
                 std::cout << "Tensor data offset: " << offset << std::endl;
@@ -389,12 +397,12 @@ namespace blass {
             }
 
             GGUFModel(const char* filepath) : file(filepath) {
-                if (std::string_view(static_cast<const char*>(file.data), 4) != "GGUF")
+                if (file.read_string_at(0, 4) != "GGUF")
                     throw std::runtime_error("Not a GGUF model");
 
-                version = *(int*)((char*)file.data + 4);
-                tensor_count = *(long long*)((char*)file.data + 8);
-                kv_count = *(long long*)((char*)file.data + 16);
+                version = file.read_at<int32_t>(4);
+                tensor_count = file.read_at<uint64_t>(8);
+                kv_count = file.read_at<uint64_t>(16);
 
                 std::cout << "Loaded GGUF model version " << version 
                         << " with " << tensor_count << " tensors and " 
