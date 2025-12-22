@@ -125,10 +125,11 @@ namespace blass {
                 Tensor<float> q = matmul(x, params["attn_q.weight"]) + attn_q_bias;
                 Tensor<float> k = matmul(x, params["attn_k.weight"]) + attn_k_bias;
                 Tensor<float> v = matmul(x, params["attn_v.weight"]) + attn_v_bias;
-
                 // RoPE
 
-                Tensor<float> attn_out; // = attention(q, k, v);
+                Tensor<float> scores = matmul(q, k.transpose()) / sqrt(64.0f);
+                Tensor<float> attn_weights = functional::softmax(scores);
+                Tensor<float> attn_out = matmul(attn_weights, v);
 
                 x = matmul(attn_out, params["attn_output.weight"]);
                 x = x + residual;

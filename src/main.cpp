@@ -4,6 +4,9 @@
 #include "tensor/tensor.h"
 #include "nn/modules.h"
 #include "random/random.h"
+#include "nn/gguf_reader.h"
+#include "nn/tokenizer.h"
+
 using namespace blass;
 
 class MyModule : public nn::Module<float> {
@@ -97,6 +100,10 @@ int main() {
     randomt::set_seed(std::chrono::system_clock::now().time_since_epoch().count());
     Tensor<float> rand = Tensor<float>::randn({3, 3}, 0.0f, 1.0f);
     std::cout << "\nRandom Normal Tensor:\n" << rand.to_string() << "\n";
+
+    // gguf_loader::GGUFModel model("model_path");
+    // std::string test = "Joseph thinks he has found a place where the independent robots are hiding! When entering the warehouse, he realizes that the robots are in a room at the very end. To reach them, he must navigate a maze of doors and corridors.";
+    // model.tk.encode(test);
 
     return 0;
 }

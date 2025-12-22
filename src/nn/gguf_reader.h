@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdexcept>
+#include "tokenizer.h"
 
 namespace blass {
     namespace gguf_loader {
@@ -293,7 +294,7 @@ namespace blass {
                         return std::to_string(std::get<double>(value));
                     case GGUF_METADATA_VALUE_TYPE_ARRAY: {
                         std::string result = "[";
-                        auto& vec = std::get<std::vector<GGUFMetadataValue>>(value);
+                        auto vec = std::get<std::vector<GGUFMetadataValue>>(value);
 
                         bool truncate = vec.size() > 10;
                         if (truncate) vec.resize(10);
@@ -328,6 +329,8 @@ namespace blass {
             uint64_t current_offset = 24; // after header
             uint64_t alignment = 1;
 
+            tokenizer::Tokenizer tk;
+
             std::vector<std::pair<std::string, GGUFMetadataValue>> metadata;
             std::vector<std::pair<std::string, tensor_data>> tensors;
 
@@ -349,7 +352,7 @@ namespace blass {
                 for (uint64_t i = 0; i < kv_count; i++) {
                     read_metadata_kv();
                     std::cout << "Metadata key: " << metadata.back().first 
-                            << ", value: " << metadata.back().second.to_string() << std::endl;
+                            << ", value: " << metadata.back().second.to_string() << std::endl;  
                 }
             }
 
@@ -392,7 +395,7 @@ namespace blass {
             }
 
             void load_tensor() {
-                for (long long i = 0; i < tensor_count; i++)
+                for (uint64_t i = 0; i < tensor_count; i++)
                     read_tensor();
             }
 
@@ -410,6 +413,39 @@ namespace blass {
 
                 load_metadata();
                 load_tensor();
+                
+                std::vector<std::string> tokens;
+                std::vector<std::pair<std::string, std::string>> merges;
+                std::vector<int> token_type;
+                
+                for (auto &meta : metadata) {
+                    if (meta.first == "tokenizer.ggml.tokens") {
+                        auto& tk_data = std::get<std::vector<GGUFMetadataValue>>(meta.second.value);
+                        tokens.reserve(tk_data.size());
+                        for (auto &t : tk_data) 
+                            tokens.push_back(std::get<std::string>(t.value));
+                    }
+                    else if (meta.first == "tokenizer.ggml.merges") {
+                        auto& mk_data = std::get<std::vector<GGUFMetadataValue>>(meta.second.value);
+                        merges.reserve(mk_data.size());
+                        for (auto &m : mk_data) {
+                            std::string merge_str = std::get<std::string>(m.value);
+                            size_t space_pos = merge_str.find(' ');
+                            if (space_pos != std::string::npos) {
+                                merges.push_back({merge_str.substr(0, space_pos), merge_str.substr(space_pos + 1)});
+                            }
+                        }
+                    }
+                    else if (meta.first == "tokenizer.ggml.token_type") {
+                        auto& tt_data = std::get<std::vector<GGUFMetadataValue>>(meta.second.value);
+                        token_type.reserve(tt_data.size());
+                        for (auto &tt : tt_data) {
+                            token_type.push_back(std::get<int32_t>(tt.value));
+                        }
+                    }
+                }
+
+                tk = tokenizer::Tokenizer(tokens, merges, token_type);
             }
         };
     }
