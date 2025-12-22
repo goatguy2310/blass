@@ -9,6 +9,8 @@
 #include <stdexcept>
 #include <functional>
 
+#include "../random/random.h"
+
 template<typename T>
 struct is_initializer_list : std::false_type {};
 
@@ -108,10 +110,46 @@ namespace blass {
             return tensor;
         }
 
-        static Tensor<T> fill_random(const std::vector<size_t>& shape_, const T& min_value, const T& max_value) {
+        static Tensor<T> rand(const std::vector<size_t>& shape_, const T& min_value, const T& max_value) {
+            Tensor<T> tensor(shape_);
+            float min_val_f = static_cast<float>(min_value);
+            float max_val_f = static_cast<float>(max_value);
+            for (size_t i = 0; i < tensor.size(); ++i) {
+                tensor.data[i] = static_cast<T>(randomt::uniform(min_val_f, max_val_f));
+            }
+            return tensor;
+        }
+
+        static Tensor<T> rand(const std::vector<size_t>& shape_) {
             Tensor<T> tensor(shape_);
             for (size_t i = 0; i < tensor.size(); ++i) {
-                tensor.data[i] = min_value + static_cast<T>(rand()) / (static_cast<T>(RAND_MAX / (max_value - min_value)));
+                tensor.data[i] = static_cast<T>(randomt::rand());
+            }
+            return tensor;
+        }
+
+        static Tensor<T> randn(const std::vector<size_t>& shape_, const T& mean, const T& stddev) {
+            Tensor<T> tensor(shape_);
+            float mean_f = static_cast<float>(mean);
+            float stddev_f = static_cast<float>(stddev);
+            for (size_t i = 0; i < tensor.size(); ++i) {
+                tensor.data[i] = static_cast<T>(randomt::normal(mean_f, stddev_f));
+            }
+            return tensor;
+        }
+
+        static Tensor<T> randn(const std::vector<size_t>& shape_) {
+            Tensor<T> tensor(shape_);
+            for (size_t i = 0; i < tensor.size(); ++i) {
+                tensor.data[i] = static_cast<T>(randomt::randn());
+            }
+            return tensor;
+        }
+
+        static Tensor<T> randint(const std::vector<size_t>& shape_, int min_value, int max_value) {
+            Tensor<T> tensor(shape_);
+            for (size_t i = 0; i < tensor.size(); ++i) {
+                tensor.data[i] = static_cast<T>(randomt::randint(min_value, max_value));
             }
             return tensor;
         }

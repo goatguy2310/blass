@@ -1,7 +1,9 @@
 #include <iostream>
+#include <chrono>
 
 #include "tensor/tensor.h"
 #include "nn/modules.h"
+#include "random/random.h"
 using namespace blass;
 
 class MyModule : public nn::Module<float> {
@@ -86,10 +88,15 @@ int main() {
     std::cout << "\nConvolution Result:\n" << conv_result.to_string() << "\n";
 
     std::shared_ptr<MyModule> my_module = std::make_shared<MyModule>();
-    Tensor<float> input_tensor = Tensor<float>::fill_random({4, 2}, 0.0f, 1.0f);
+    Tensor<float> input_tensor = Tensor<float>::rand({4, 2});
     Tensor<float> output_tensor = (*my_module)(input_tensor);
     std::cout << "\nInput Tensor:\n" << input_tensor.to_string() << "\n";
     std::cout << "\nMyModule Output:\n" << output_tensor.to_string() << "\n";
+
+    // set time as seed
+    randomt::set_seed(std::chrono::system_clock::now().time_since_epoch().count());
+    Tensor<float> rand = Tensor<float>::randn({3, 3}, 0.0f, 1.0f);
+    std::cout << "\nRandom Normal Tensor:\n" << rand.to_string() << "\n";
 
     return 0;
 }
