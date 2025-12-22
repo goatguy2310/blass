@@ -89,6 +89,19 @@ namespace blass {
             GGML_TYPE_COUNT   = 40,
         };
 
+        #define QK_K 256
+        struct block_q4_K {
+            union {
+                struct {
+                    uint16_t d;
+                    uint16_t dmin;
+                };
+            };
+
+            uint8_t scales[12];
+            uint8_t qk[QK_K / 2];
+        };
+
         enum gguf_metadata_value_type: uint32_t {
             // The value is a 8-bit unsigned integer.
             GGUF_METADATA_VALUE_TYPE_UINT8 = 0,
@@ -290,15 +303,27 @@ namespace blass {
             }
         };
 
-        class GGUF_Model {
+        struct tensor_data {
+            ggml_type type;
+            std::vector<uint32_t> dims;
+            void* data;
+        };
+
+        class GGUFModel {
         public:
             MemoryMappedFile file;
             int version;
-            long long tensor_count;
-            long long kv_count;
+            uint64_t tensor_count;
+            uint64_t kv_count;
             int current_offset = 24; // after header
+            uint64_t alignment = 1;
 
             std::vector<std::pair<std::string, GGUFMetadataValue>> metadata;
+            std::vector<std::pair<std::string, tensor_data>> tensors;
+
+            uint64_t align_offset(uint64_t offset) {
+                return (offset + alignment - 1) & ~(alignment - 1);
+            }
 
             void read_metadata_kv() {
                 uint64_t length = *(uint64_t*)((char*)file.data + current_offset);
@@ -320,7 +345,50 @@ namespace blass {
                 }
             }
 
-            GGUF_Model(const char* filepath) : file(filepath) {
+            void read_tensor() {
+                uint64_t name_length = *(uint64_t*)((char*)file.data + current_offset);
+                current_offset += 8;
+                std::string name((char*)file.data + current_offset, name_length);
+                current_offset += name_length;
+                
+                std::cout << "Reading tensor: " << name << std::endl;
+
+                uint32_t n_dims = *(uint32_t*)((char*)file.data + current_offset);
+                current_offset += 4;
+                std::vector<uint32_t> dims(n_dims);
+
+                for (uint32_t i = 0; i < n_dims; i++) {
+                    dims[i] = *(uint64_t*)((char*)file.data + current_offset);
+                    current_offset += 8;
+                }
+
+                ggml_type type = *(ggml_type*)((char*)file.data + current_offset);
+                current_offset += 4;
+                std::cout << "Tensor name: " << name << ", dims: [";
+                for (uint32_t i = 0; i < n_dims; i++) {
+                    std::cout << dims[i];
+                    if (i + 1 < n_dims) std::cout << ", ";
+                }
+                std::cout << "], type: " << (uint32_t)type << std::endl;
+
+                uint64_t offset = *(uint64_t*)((char*)file.data + current_offset);
+                current_offset += 8;
+
+                std::cout << "Tensor data offset: " << offset << std::endl;
+
+                tensor_data tdata;
+                tdata.type = type;
+                tdata.dims = dims;
+                tdata.data = (char*)file.data + offset;
+                tensors.push_back({name, tdata});
+            }
+
+            void load_tensor() {
+                for (long long i = 0; i < tensor_count; i++)
+                    read_tensor();
+            }
+
+            GGUFModel(const char* filepath) : file(filepath) {
                 if (std::string_view(static_cast<const char*>(file.data), 4) != "GGUF")
                     throw std::runtime_error("Not a GGUF model");
 
@@ -333,6 +401,7 @@ namespace blass {
                         << kv_count << " key-value pairs." << std::endl;
 
                 load_metadata();
+                load_tensor();
             }
         };
     }

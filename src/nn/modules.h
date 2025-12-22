@@ -121,6 +121,10 @@ namespace blass {
                 this->register_parameter("weight", weight);
             }
 
+            void load_weight(const Tensor<T>& w) {
+                weight = w;
+            }
+
             Tensor<T> forward(const Tensor<T>& input) override {
                 Tensor<T> result = input.clone();
                 size_t last_dim = result.get_shape().back();
