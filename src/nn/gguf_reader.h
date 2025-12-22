@@ -351,8 +351,8 @@ namespace blass {
                 metadata.reserve(kv_count);
                 for (uint64_t i = 0; i < kv_count; i++) {
                     read_metadata_kv();
-                    std::cout << "Metadata key: " << metadata.back().first 
-                            << ", value: " << metadata.back().second.to_string() << std::endl;  
+                    // std::cout << "Metadata key: " << metadata.back().first 
+                    //         << ", value: " << metadata.back().second.to_string() << std::endl;  
                 }
             }
 
@@ -361,8 +361,6 @@ namespace blass {
                 current_offset += 8;
                 std::string name = file.read_string_at(current_offset, name_length);
                 current_offset += name_length;
-                
-                std::cout << "Reading tensor: " << name << std::endl;
 
                 uint32_t n_dims = file.read_at<uint32_t>(current_offset);
                 current_offset += 4;
@@ -375,17 +373,17 @@ namespace blass {
 
                 ggml_type type = file.read_at<ggml_type>(current_offset);
                 current_offset += 4;
-                std::cout << "Tensor name: " << name << ", dims: [";
-                for (uint32_t i = 0; i < n_dims; i++) {
-                    std::cout << dims[i];
-                    if (i + 1 < n_dims) std::cout << ", ";
-                }
-                std::cout << "], type: " << (uint32_t)type << std::endl;
+                // std::cout << "Tensor name: " << name << ", dims: [";
+                // for (uint32_t i = 0; i < n_dims; i++) {
+                //     std::cout << dims[i];
+                //     if (i + 1 < n_dims) std::cout << ", ";
+                // }
+                // std::cout << "], type: " << (uint32_t)type << std::endl;
 
                 uint64_t offset = file.read_at<uint64_t>(current_offset);
                 current_offset += 8;
 
-                std::cout << "Tensor data offset: " << offset << std::endl;
+                // std::cout << "Tensor data offset: " << offset << std::endl;
 
                 tensor_data tdata;
                 tdata.type = type;

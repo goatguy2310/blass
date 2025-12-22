@@ -102,7 +102,7 @@ int main() {
     std::cout << "\nRandom Normal Tensor:\n" << rand.to_string() << "\n";
 
     // gguf_loader::GGUFModel model("model_path");
-    // std::string test = "Joseph thinks he has found a place where the independent robots are hiding! When entering the warehouse, he realizes that the robots are in a room at the very end. To reach them, he must navigate a maze of doors and corridors.";
+    // std::string test = "Test abc 1234 1+1=2 aaaaaaaa 12345678910";
     // model.tk.encode(test);
 
     return 0;
