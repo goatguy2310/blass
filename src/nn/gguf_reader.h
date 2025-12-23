@@ -387,7 +387,10 @@ namespace blass {
 
                 tensor_data tdata;
                 tdata.type = type;
+                
+                std::reverse(dims.begin(), dims.end());
                 tdata.dims = dims;
+                
                 tdata.data = (char*)file.data + offset;
                 tensors.push_back({name, tdata});
             }

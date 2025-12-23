@@ -34,10 +34,10 @@ namespace blass {
     Tensor<T> divide(const Tensor<T>& a, const Tensor<T>& b);
 
     template <typename T>
-    Tensor<T> matmul(const Tensor<T>& a, const Tensor<T>& b);
+    Tensor<T> matmul(const Tensor<T>& a, const Tensor<T>& b, bool b_transposed = false);
 
     template <typename T>
-    Tensor<T> matmul_2d(const Tensor<T>& a, const Tensor<T>& b, bool use_omp = true);
+    Tensor<T> matmul_2d(const Tensor<T>& a, const Tensor<T>& b, bool b_transposed = false, bool use_omp = true);
 
     template <typename T>
     Tensor<T> convolve1D(const Tensor<T>& input, const Tensor<T>& kernel, bool use_padding = 1);
@@ -165,6 +165,8 @@ namespace blass {
             sz = strides.empty() ? 1 : strides[0] * shape[0];
             data = std::shared_ptr<T[]>(new T[sz]);
         }
+
+        Tensor() {}
 
         Tensor(const std::shared_ptr<T[]>& data_, const std::vector<size_t>& shape_) : data(data_), shape(shape_) {
             strides.resize(shape.size());
@@ -388,8 +390,8 @@ namespace blass {
         friend Tensor<T> subtract<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> multiply<>(const Tensor<T>& a, const Tensor<T>& b);
         friend Tensor<T> divide<>(const Tensor<T>& a, const Tensor<T>& b);
-        friend Tensor<T> matmul<>(const Tensor<T>& a, const Tensor<T>& b);
-        friend Tensor<T> matmul_2d<>(const Tensor<T>& a, const Tensor<T>& b, bool use_omp);
+        friend Tensor<T> matmul<>(const Tensor<T>& a, const Tensor<T>& b, bool b_transposed);
+        friend Tensor<T> matmul_2d<>(const Tensor<T>& a, const Tensor<T>& b, bool b_transposed, bool use_omp);
         friend Tensor<T> convolve1D<>(const Tensor<T>& input, const Tensor<T>& kernel, bool use_padding);
 
         Tensor<T> operator+(const Tensor<T>& other) const;

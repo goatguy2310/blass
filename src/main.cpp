@@ -3,6 +3,7 @@
 
 #include "tensor/tensor.h"
 #include "nn/modules.h"
+#include "nn/models.h"
 #include "random/random.h"
 #include "nn/gguf_reader.h"
 #include "nn/tokenizer.h"
@@ -83,6 +84,9 @@ int main() {
     Tensor<float> mat_b = {{7, 8}, {9, 10}, {11, 12}};
     Tensor<float> mat_result = matmul(mat_a, mat_b);
     std::cout << "\nMatrix Multiplication Result:\n" << mat_result.to_string() << "\n";
+    Tensor<float> mat_result_btrans = matmul(mat_a, mat_b.transpose2D(), true);
+    std::cout << "\nMatrix B Transposed:\n" << mat_b.transpose2D().to_string() << "\n";
+    std::cout << "\nMatrix Multiplication with B Transposed Result:\n" << mat_result_btrans.to_string() << "\n";
 
     // convolve1D test
     Tensor<float> input = {{1, 2, 3, 4, 5}, {6, 7, 8, 9, 10}};
@@ -101,9 +105,17 @@ int main() {
     Tensor<float> rand = Tensor<float>::randn({3, 3}, 0.0f, 1.0f);
     std::cout << "\nRandom Normal Tensor:\n" << rand.to_string() << "\n";
 
-    // gguf_loader::GGUFModel model("model_path");
-    // std::string test = "Test abc 1234 1+1=2 aaaaaaaa 12345678910";
-    // model.tk.encode(test);
+    models::Qwen2Model qwen_model;
+    qwen_model.load_model("/home/pichu2405/win/Documents/Work/Projects/test_blass/Qwen2.5-0.5B-Instruct-f16.gguf");
+    std::string test = "Test abc 1234 1+1=2 aaaaaaaa 12345678910";
+    auto res = qwen_model.tk.encode(test);
+    Tensor<float> model_output = qwen_model.run_inference(res);
+
+    std::cout << "\nModel output shape: ";
+    for (const auto& dim : model_output.get_shape()) {
+        std::cout << dim << " ";
+    }
+    std::cout << "\n";
 
     return 0;
 }

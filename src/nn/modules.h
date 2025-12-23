@@ -117,12 +117,13 @@ namespace blass {
             Tensor<T> weight;
             float eps;
             RMSNorm(int dim, float epsilon=1e-8f) : eps(epsilon) {
-                weight = Tensor<T>::fill_random({dim}, 0.9f, 1.1f);
+                assert(dim > 0 && "Dimension must be positive");
+                weight = Tensor<T>::rand({(size_t)dim}, 0.9f, 1.1f);
                 this->register_parameter("weight", weight);
             }
 
             void load_weight(const Tensor<T>& w) {
-                weight = w;
+                weight = w.clone();
             }
 
             Tensor<T> forward(const Tensor<T>& input) override {

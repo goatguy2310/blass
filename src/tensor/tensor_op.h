@@ -264,21 +264,25 @@ namespace blass {
     }
 
     template <typename T>
-    Tensor<T> matmul_2d(const Tensor<T> &a, const Tensor<T> &b, bool use_omp) {
+    Tensor<T> matmul_2d(const Tensor<T> &a, const Tensor<T> &b, bool b_transposed_, bool use_omp) {
         if (!a.is_contiguous()) {
-            return matmul_2d(a.contiguous(), b, use_omp);
+            return matmul_2d(a.contiguous(), b, b_transposed_, use_omp);
         }
 
         assert(a.get_shape().size() == 2 && b.get_shape().size() == 2 && "Both tensors must be 2D for matmul_2d");
-        assert(a.get_shape(1) == b.get_shape(0) && "Inner dimensions must match for matmul_2d");
+        assert(a.get_shape(1) == b.get_shape(b_transposed_) && "Inner dimensions must match for matmul_2d");
 
         size_t m = a.get_shape(0);
         size_t n = a.get_shape(1);
-        size_t p = b.get_shape(1);
+        size_t p = b.get_shape(!b_transposed_);
 
         Tensor<T> result = Tensor<T>::from_shape({m, p});
 
-        Tensor<T> b_transposed = b.transpose(); // assumes transpose does automatic contiguous
+        Tensor<T> b_transposed;
+        if (!b_transposed_)
+            b_transposed = b.transpose(); // assumes transpose does automatic contiguous
+        else 
+            b_transposed = b.contiguous();
 
         if (m * p < 32) {
             for (size_t i = 0; i < m; ++i) {
@@ -341,13 +345,13 @@ namespace blass {
     }
 
     template <typename T>
-    Tensor<T> matmul(const Tensor<T> &a, const Tensor<T> &b) {
+    Tensor<T> matmul(const Tensor<T> &a, const Tensor<T> &b, bool b_transposed_) {
         if (a.shape.size() < 2 || b.shape.size() < 2) {
             throw std::invalid_argument("Both tensors must be at least 2D for matmul");
         }
 
         if (a.shape.size() == 2 && b.shape.size() == 2) {
-            return matmul_2d(a, b);
+            return matmul_2d(a, b, b_transposed_);
         }
 
         std::vector<size_t> batch_a_shape, batch_b_shape;
@@ -364,8 +368,10 @@ namespace blass {
             batch_b_shape.push_back(1);
         
         std::vector<size_t> batch_result_shape = broadcast_shape(batch_a_shape, batch_b_shape);
-        if (a.shape[a.shape.size() - 1] != b.shape[b.shape.size() - 2]) {
-            throw std::invalid_argument("Inner dimensions must match for matmul");
+        if (a.shape[a.shape.size() - 1] != b.shape[b.shape.size() - (b_transposed_ ? 1 : 2)]) {
+            throw std::invalid_argument("Inner dimensions must match for matmul, multiplying shapes " + 
+                                        utils::to_string_vec(a.shape) + " and " + 
+                                        utils::to_string_vec(b.shape));
         }
 
         std::vector<size_t> a_broadcast_shape = batch_result_shape;
@@ -381,7 +387,7 @@ namespace blass {
 
         std::vector<size_t> result_shape = batch_result_shape;
         result_shape.push_back(a.shape[a.shape.size() - 2]);
-        result_shape.push_back(b.shape[b.shape.size() - 1]);
+        result_shape.push_back(b.shape[b.shape.size() - (b_transposed_ ? 2 : 1)]);
 
         Tensor<T> result = Tensor<T>::from_shape(result_shape);
 
@@ -390,7 +396,7 @@ namespace blass {
         for (size_t dim : batch_result_shape)
             batch_size *= dim;
 
-        size_t batch_stride = a.shape[a.shape.size() - 2] * b.shape[b.shape.size() - 1];
+        size_t batch_stride = a.shape[a.shape.size() - 2] * b.shape[b.shape.size() - (b_transposed_ ? 2 : 1)];
         
         const auto& sa = a_broadcasted.strides;
         const auto& sb = b_broadcasted.strides;
@@ -419,7 +425,7 @@ namespace blass {
             Tensor<T> b_slice(ptr_b, 
                                 {b.shape[b.shape.size() - 2], b.shape[b.shape.size() - 1]});
 
-            Tensor<T> mat_result = matmul_2d(a_slice, b_slice, !use_omp_batch);
+            Tensor<T> mat_result = matmul_2d(a_slice, b_slice, b_transposed_, !use_omp_batch);
             T* __restrict__ mat_result_ptr = mat_result.data.get();
             
             #pragma omp simd
