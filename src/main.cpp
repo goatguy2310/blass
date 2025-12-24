@@ -105,17 +105,13 @@ int main() {
     Tensor<float> rand = Tensor<float>::randn({3, 3}, 0.0f, 1.0f);
     std::cout << "\nRandom Normal Tensor:\n" << rand.to_string() << "\n";
 
-    models::Qwen2Model qwen_model;
-    qwen_model.load_model("/home/pichu2405/win/Documents/Work/Projects/test_blass/Qwen2.5-0.5B-Instruct-f16.gguf");
-    std::string test = "Test abc 1234 1+1=2 aaaaaaaa 12345678910";
-    auto res = qwen_model.tk.encode(test);
-    Tensor<float> model_output = qwen_model.run_inference(res);
+    // models::Qwen2Model qwen_model;
+    // qwen_model.load_model("model_path.gguf");
+    // std::string test = "Earth is a ";
+    // auto res = qwen_model.tk.encode(test);
+    // std::string model_output = qwen_model.run_inference(res);
 
-    std::cout << "\nModel output shape: ";
-    for (const auto& dim : model_output.get_shape()) {
-        std::cout << dim << " ";
-    }
-    std::cout << "\n";
+    // std::cout << model_output << "\n";
 
     return 0;
 }

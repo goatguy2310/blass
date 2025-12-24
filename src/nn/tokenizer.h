@@ -29,6 +29,11 @@ namespace blass {
                 return conv.to_bytes(c);
             }
 
+            std::string get_token(size_t idx) {
+                if (idx >= tokens.size()) throw std::out_of_range("Token index out of range");
+                return tokens[idx];
+            }
+
             std::vector<int> encode(const std::string& _text) {
                 std::u32string text = utf8_to_u32(_text);
                 std::vector<std::string> words;

@@ -3,6 +3,7 @@
 #include "../tensor/tensor.h"
 #include <math.h>
 #include <map>
+#include <limits>
 
 namespace blass {
     namespace nn {
@@ -32,6 +33,42 @@ namespace blass {
                     T inv_sum = static_cast<T>(1.0) / sum;
                     for (size_t j = 0; j < last_dim; j++)
                         row[j] *= inv_sum;
+                }
+                return result;
+            }
+
+            template<typename T>
+            Tensor<T> rope(const Tensor<T>& input, float theta = 1000000.0f) {
+                Tensor<T> result = input.clone();
+                std::vector<size_t> shape = result.get_shape();
+                size_t head_dim = shape.back();
+                size_t n_heads = shape[shape.size() - 2];
+                size_t seq_len = shape[shape.size() - 3];
+                size_t batch_size = result.size() / (seq_len * n_heads * head_dim);
+                size_t half_dim = head_dim / 2;
+
+                T* data = result.get_data();
+
+                #pragma omp parallel for collapse(3)
+                for (size_t b = 0; b < batch_size; b++) {
+                    for (size_t s = 0; s < seq_len; s++) {
+                        for (size_t h = 0; h < n_heads; h++) {
+                            T* head_data = data + b * seq_len * n_heads * head_dim + s * n_heads * head_dim + h * head_dim;
+                            
+                            for (size_t d = 0; d < half_dim; d++) {
+                                float freq = 1.0f / std::pow(theta, (float)(2 * d) / head_dim);
+                                float val = s * freq;
+                                float cos_val = std::cos(val);
+                                float sin_val = std::sin(val);
+                                
+                                T x0 = head_data[d];
+                                T x1 = head_data[d + half_dim];
+                                
+                                head_data[d] = x0 * cos_val - x1 * sin_val;
+                                head_data[d + half_dim] = x0 * sin_val + x1 * cos_val;
+                            }
+                        }
+                    }
                 }
                 return result;
             }

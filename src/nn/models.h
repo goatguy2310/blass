@@ -1,6 +1,8 @@
 #pragma once 
 
 #include <stdfloat>
+#include <iostream>
+#include <fstream>
 #include "../tensor/tensor.h"
 #include "modules.h"
 #include "gguf_reader.h"
@@ -20,8 +22,8 @@ namespace blass {
             std::shared_ptr<nn::SiLU<float>> ffn_activation;
         public:
             Qwen2Block() {
-                attn_norm = std::make_shared<nn::RMSNorm<float>>(4096, 1e-6f);
-                ffn_norm = std::make_shared<nn::RMSNorm<float>>(4096, 1e-6f);
+                attn_norm = std::make_shared<nn::RMSNorm<float>>(896, 1e-6f);
+                ffn_norm = std::make_shared<nn::RMSNorm<float>>(896, 1e-6f);
                 ffn_activation = std::make_shared<nn::SiLU<float>>();
                 this->register_module("attn_norm", attn_norm);
                 this->register_module("ffn_norm", ffn_norm);
@@ -33,9 +35,9 @@ namespace blass {
                 param = Tensor<float>::from_shape(dims);
                 size_t total_elems = param.size();
                 float* dest = param.get_data();
-                uint16_t* src = (uint16_t*)data.data;
+                std::float16_t* src = (std::float16_t*)data.data;
                 for (size_t i = 0; i < total_elems; i++) {
-                    dest[i] = std::float16_t(src[i]);
+                    dest[i] = src[i];
                 }
             }
 
@@ -62,8 +64,9 @@ namespace blass {
                 if (name == "attn_norm.weight") {
                     attn_norm->load_weight(param);
                 }
-                else if (name == "ffn_norm.weight")
+                else if (name == "ffn_norm.weight") {
                     ffn_norm->load_weight(param);
+                }
                 else {
                     tensors[name] = param.clone();
                     register_parameter(name, tensors[name]);
@@ -86,7 +89,13 @@ namespace blass {
                 Tensor<float> k = matmul(x, *params["attn_k.weight"], true) + *params["attn_k.bias"];
                 Tensor<float> v = matmul(x, *params["attn_v.weight"], true) + *params["attn_v.bias"];
                 
-                // TODO: RoPE
+                q = q.view({batch_size, seq_len, num_attn_heads, head_dim});
+                k = k.view({batch_size, seq_len, num_kv_heads, head_dim});
+                v = v.view({batch_size, seq_len, num_kv_heads, head_dim});
+
+                // questionable whether this is correct
+                q = nn::functional::rope(q);
+                k = nn::functional::rope(k);
 
                 q = q.view({batch_size, seq_len, num_attn_heads, head_dim}).contiguous();
                 k = k.view({batch_size, seq_len, num_kv_heads, 1, head_dim}).contiguous();
@@ -102,7 +111,17 @@ namespace blass {
                 k = k.transpose({0, 2, 1, 3}); 
                 v = v.transpose({0, 2, 1, 3});
 
-                Tensor<float> scores = matmul(q, k.transpose2D()) / sqrt(64.0f);
+                Tensor<float> scores = matmul(q, k.transpose2D()) / sqrt((float)head_dim);
+                
+                // causal mask, literally hardcoded because i just want it to run for now
+                for (size_t i = 0; i < scores.size(); i++) {
+                    size_t s_q = (i / scores.get_shape(3)) % scores.get_shape(2);
+                    size_t s_k = i % scores.get_shape(3);
+                    if (s_k > s_q) {
+                        scores.get_data()[i] = -std::numeric_limits<float>::infinity();
+                    }
+                }
+
                 Tensor<float> attn_weights = nn::functional::softmax(scores);
                 Tensor<float> attn_out = matmul(attn_weights, v);
 
@@ -112,7 +131,7 @@ namespace blass {
                 x = matmul(attn_out, *params["attn_output.weight"], true);
                 x = x + residual;
 
-                residual = x;
+                residual = x.clone();
 
                 x = (*ffn_norm)(x);
                 Tensor<float> gate = matmul(x, *params["ffn_gate.weight"], true);
@@ -121,6 +140,7 @@ namespace blass {
                 Tensor<float> activated = (*ffn_activation)(gate) * up;
 
                 x = matmul(activated, *params["ffn_down.weight"], true);
+                
                 x = x + residual;
 
                 return x;
@@ -150,9 +170,9 @@ namespace blass {
                 param = Tensor<float>::from_shape(dims);
                 size_t total_elems = param.size();
                 float* dest = param.get_data();
-                uint16_t* src = (uint16_t*)data.data;
+                std::float16_t* src = (std::float16_t*)data.data;
                 for (size_t i = 0; i < total_elems; i++) {
-                    dest[i] = std::float16_t(src[i]);
+                    dest[i] = src[i];
                 }
             }
 
@@ -205,8 +225,10 @@ namespace blass {
                         } 
                         else 
                             throw std::runtime_error("Unsupported tensor type in Qwen2Model: " + std::to_string((uint32_t)tensor_info.type));
-                        if (name == "output_norm.weight")
+                        
+                        if (name == "output_norm.weight") {
                             output_norm->load_weight(param);
+                        }
                         else if (name == "token_embd.weight") {
                             token_embd = param.clone();
                             register_parameter(name, token_embd);
@@ -215,7 +237,7 @@ namespace blass {
                 }
             }
 
-            Tensor<float> run_inference(const std::vector<int>& token_ids) {
+            std::string run_inference(const std::vector<int>& token_ids) {
                 size_t seq_len = token_ids.size();
                 int hidden_dim = params["token_embd.weight"]->get_shape(1);
 
@@ -234,18 +256,39 @@ namespace blass {
                     std::memcpy(dest_row, src_row, hidden_dim * sizeof(float));
                 }
 
-                return forward(x);
+                x = forward(x);
+                Tensor<float> results = matmul(x, *params["token_embd.weight"], true);
+
+                int mx = 0;
+                int lst_token = results.get_shape(1) - 1;
+                std::vector<std::pair<float, int>> token_probs;
+                float max_val = results(0, lst_token, 0);
+                for (size_t i = 0; i < results.get_shape(2); i++) {
+                    if (results(0, lst_token, i) > max_val) {
+                        max_val = results(0, lst_token, i);
+                        mx = i;
+                    }
+                    
+                    float val = results(0, lst_token, i);
+                    // if val is not nan
+                    if (val == val)
+                        token_probs.push_back({val, (int)i});
+                }
+
+                std::sort(token_probs.begin(), token_probs.end(), std::greater<std::pair<float, int>>());
+
+                for (int i = 0; i < 10; i++) {
+                    std::cout << "Token " << token_probs[i].second << " with string " << tk.get_token(token_probs[i].second) << " logit: " << token_probs[i].first << std::endl;
+                }
+                return tk.get_token(mx);
             }
 
             Tensor<float> forward(const Tensor<float>& input) override {
                 Tensor<float> x = input.clone();
 
-                std::cout << "Starting forward pass through Qwen2Model..." << std::endl;
-
                 for (int i = 0; i < 24; i++) {
                     x = (*blocks[i])(x);
                 }
-
                 x = (*output_norm)(x);
                 return x;
             }

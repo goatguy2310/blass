@@ -327,7 +327,7 @@ namespace blass {
             uint64_t tensor_count;
             uint64_t kv_count;
             uint64_t current_offset = 24; // after header
-            uint64_t alignment = 1;
+            uint64_t alignment = 32;
 
             tokenizer::Tokenizer tk;
 
@@ -414,6 +414,12 @@ namespace blass {
 
                 load_metadata();
                 load_tensor();
+
+                current_offset = align_offset(current_offset);
+
+                for (auto &[name, data] : tensors) {
+                    data.data = (void*)((char*)data.data + current_offset);
+                }
                 
                 std::vector<std::string> tokens;
                 std::vector<std::pair<std::string, std::string>> merges;
