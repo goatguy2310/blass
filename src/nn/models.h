@@ -60,7 +60,7 @@ namespace blass {
                 } 
                 else 
                     throw std::runtime_error("Unsupported tensor type in Qwen2Block: " + std::to_string((uint32_t)data.type));
-                
+
                 if (name == "attn_norm.weight") {
                     attn_norm->load_weight(param);
                 }

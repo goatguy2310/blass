@@ -106,8 +106,8 @@ int main() {
     std::cout << "\nRandom Normal Tensor:\n" << rand.to_string() << "\n";
 
     // models::Qwen2Model qwen_model;
-    // qwen_model.load_model("model_path.gguf");
-    // std::string test = "Earth is a ";
+    // qwen_model.load_model("model_path");
+    // std::string test = "Earth is a";
     // auto res = qwen_model.tk.encode(test);
     // std::string model_output = qwen_model.run_inference(res);
 

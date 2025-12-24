@@ -317,6 +317,7 @@ namespace blass {
         struct tensor_data {
             ggml_type type;
             std::vector<uint32_t> dims;
+            int offset;
             void* data;
         };
 
@@ -391,7 +392,8 @@ namespace blass {
                 std::reverse(dims.begin(), dims.end());
                 tdata.dims = dims;
                 
-                tdata.data = (char*)file.data + offset;
+                tdata.offset = offset;
+                tdata.data = nullptr;
                 tensors.push_back({name, tdata});
             }
 
@@ -418,7 +420,8 @@ namespace blass {
                 current_offset = align_offset(current_offset);
 
                 for (auto &[name, data] : tensors) {
-                    data.data = (void*)((char*)data.data + current_offset);
+                    assert(data.offset % alignment == 0 && "Tensor data offset is not aligned properly");
+                    data.data = (char*)file.data + data.offset + current_offset;
                 }
                 
                 std::vector<std::string> tokens;

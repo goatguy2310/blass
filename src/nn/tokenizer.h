@@ -36,6 +36,10 @@ namespace blass {
 
             std::vector<int> encode(const std::string& _text) {
                 std::u32string text = utf8_to_u32(_text);
+                
+                while (text.size() > 0 && text.back() == U' ')
+                    text.pop_back();
+
                 std::vector<std::string> words;
                 words.reserve(text.size());
                 for (char32_t c : text) {
@@ -62,8 +66,9 @@ namespace blass {
                 std::cout << std::endl;
 
                 std::vector<int> tokens;
-                for (auto &i: words)
+                for (auto &i: words) {
                     tokens.push_back(encoder[i]);
+                }
                 return tokens;
             }
 
