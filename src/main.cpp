@@ -105,13 +105,30 @@ int main() {
     Tensor<float> rand = Tensor<float>::randn({3, 3}, 0.0f, 1.0f);
     std::cout << "\nRandom Normal Tensor:\n" << rand.to_string() << "\n";
 
-    // models::Qwen2Model qwen_model;
-    // qwen_model.load_model("model_path");
-    // std::string test = "Earth is a";
-    // auto res = qwen_model.tk.encode(test);
-    // std::string model_output = qwen_model.run_inference(res);
+    models::Qwen2Model qwen_model;
+    // qwen_model.load_model("models/Qwen2.5-0.5B-Instruct-f16.gguf");
+    qwen_model.load_model("model_path");
 
-    // std::cout << model_output << "\n";
+    std::string prompt, answer;
+    int ans_len;
+    std::cout << "Enter prompt: ";
+    std::getline(std::cin, prompt);
+    std::cout << "Enter answer length (in tokens): ";
+    std::cin >> ans_len;
+    answer = prompt;
+
+    auto start = std::chrono::steady_clock::now();
+    for (int _ = 0; _ < ans_len; _++) {
+        auto res = qwen_model.tk.encode(answer);
+        std::string model_output = qwen_model.run_inference(res);
+        answer += model_output;
+    }
+    auto end = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << "Prompt: " << prompt << "\n";
+    std::cout << "Answer: " << answer << "\n";
+    std::cout << "Time: " << duration << " ms, " << ((duration / 1000.0) / static_cast<double>(ans_len)) << " s/token\n";
 
     return 0;
 }
